@@ -98,7 +98,8 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
             <form onSubmit={handleSubmit} className="space-y-6">
 
                 {/* Card 1: Cliente */}
-                <div className="glass-card p-6 sm:p-8 relative group hover:border-brand-light/30 transition-colors">
+                <fieldset className="glass-card p-6 sm:p-8 relative group hover:border-brand-light/30 transition-colors">
+                    <legend className="sr-only">Dados do Cliente</legend>
                     <div className="absolute -left-3 -top-3 w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center border border-gray-100/50 text-brand">
                         <User size={24} strokeWidth={1.5} />
                     </div>
@@ -114,10 +115,11 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
                             {errorPhone && <p className="text-red-500 text-sm mt-1">Digite apenas números (10 ou 11 dígitos).</p>}
                         </div>
                     </div>
-                </div>
+                </fieldset>
 
                 {/* Card 2: Equipamento */}
-                <div className="glass-card p-6 sm:p-8 relative group hover:border-brand-light/30 transition-colors">
+                <fieldset className="glass-card p-6 sm:p-8 relative group hover:border-brand-light/30 transition-colors">
+                    <legend className="sr-only">Dados do Equipamento</legend>
                     <div className="absolute -left-3 -top-3 w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center border border-gray-100/50 text-brand">
                         <Car size={24} strokeWidth={1.5} />
                     </div>
@@ -132,10 +134,11 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
                             <input type="text" id="placa" name="placa" required className="input-field" placeholder="Ex: ABC-1234" />
                         </div>
                     </div>
-                </div>
+                </fieldset>
 
                 {/* Card 3: Serviço */}
-                <div className="glass-card p-6 sm:p-8 relative group hover:border-brand-light/30 transition-colors">
+                <fieldset className="glass-card p-6 sm:p-8 relative group hover:border-brand-light/30 transition-colors">
+                    <legend className="sr-only">Informações do Serviço</legend>
                     <div className="absolute -left-3 -top-3 w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center border border-gray-100/50 text-brand">
                         <FileText size={24} strokeWidth={1.5} />
                     </div>
@@ -174,7 +177,7 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
                             </div>
                         </div>
                     </div>
-                </div>
+                </fieldset>
 
                 {/* Submit */}
                 <div className="pt-4">

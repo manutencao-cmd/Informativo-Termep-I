@@ -2,7 +2,7 @@
 
 @theme {
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  
+
   --color-brand: #005f73;
   --color-brand-light: #007c96;
   --color-accent: #25D366;
@@ -19,7 +19,7 @@
     -moz-osx-font-smoothing: grayscale;
     min-height: 100vh;
   }
-  
+
   @media (min-width: 640px) {
     body {
       background-color: var(--color-bg-light);

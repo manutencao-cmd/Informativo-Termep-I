@@ -1,22 +1,35 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Informativo TERMEP</title>
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#005f73" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/service-worker.js').catch(err => console.log('SW Setup:', err));
-        });
-      }
-    </script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Informativo TERMEP - Oficina Mecânica</title>
+  <meta name="description"
+    content="Informativo de serviços TERMEP. Acompanhe o status do seu equipamento e receba atualizações via WhatsApp." />
+
+  <!-- Open Graph / WhatsApp -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Informativo TERMEP" />
+  <meta property="og:description" content="Acompanhe o status do seu serviço na TERMEP." />
+  <meta property="og:image" content="/og-image.png" />
+
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#005f73" />
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js').catch(err => console.log('SW Setup:', err));
+      });
+    }
+  </script>
+</body>
+
 </html>
