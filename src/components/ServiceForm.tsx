@@ -33,23 +33,26 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
             const valor = valorInput ? parseFloat(valorInput).toFixed(2) : '0.00';
             const hoje = new Date();
 
-            let fotosUrls: string[] = [];
-            let tempPhotos: string[] = [];
+            let anexos: { url: string, type: string, name: string }[] = [];
+            let tempAnexos: { url: string, type: string, name: string }[] = [];
 
             if (files.length > 0) {
-                setStatus(`Processando ${files.length} foto(s)...`);
+                setStatus(`Processando ${files.length} arquivo(s)...`);
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i];
                     const localUrl = URL.createObjectURL(file);
-                    tempPhotos.push(localUrl);
+                    const fileType = file.type.split('/')[0] === 'image' ? 'image' :
+                        file.type.split('/')[0] === 'video' ? 'video' : 'pdf';
+
+                    const anexoItem = { url: localUrl, type: fileType, name: file.name };
+                    tempAnexos.push(anexoItem);
 
                     if (storage) {
                         try {
-                            setStatus(`Enviando foto ${i + 1} de ${files.length}...`);
+                            setStatus(`Enviando ${fileType} ${i + 1} de ${files.length}...`);
                             const fileName = `oficina/${Date.now()}_${file.name}`;
                             const storageRef = ref(storage, fileName);
 
-                            // Timeout para o upload não travar o app
                             const uploadPromise = uploadBytes(storageRef, file);
                             const timeoutPromise = new Promise((_, reject) =>
                                 setTimeout(() => reject(new Error("Timeout no upload")), 15000)
@@ -57,10 +60,9 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
 
                             const snapshot = await Promise.race([uploadPromise, timeoutPromise]) as any;
                             const url = await getDownloadURL(snapshot.ref);
-                            fotosUrls.push(url);
+                            anexos.push({ url, type: fileType, name: file.name });
                         } catch (storageErr) {
                             console.warn("Falha no upload para o Storage:", storageErr);
-                            // Continua sem a foto no storage, usará o blob local
                         }
                     }
                 }
@@ -71,8 +73,8 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
                 ...data,
                 telefone: rawPhone,
                 valor,
-                fotos: fotosUrls,
-                tempPhotos,
+                arquivos: anexos,
+                tempAnexos,
                 data: hoje,
             };
 
@@ -156,15 +158,14 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
                 </div>
 
                 <div>
-                    <label htmlFor="fotos" className="label-text">Fotos (Câmera ou Galeria)</label>
+                    <label htmlFor="fotos" className="label-text">Anexos (Fotos, Vídeos ou PDF)</label>
                     <div className="relative">
                         <input
                             type="file"
                             id="fotos"
                             name="fotos"
-                            accept="image/*"
+                            accept="image/*,video/*,application/pdf"
                             multiple
-                            capture="environment"
                             onChange={handleFileChange}
                             className="input-field py-1"
                         />

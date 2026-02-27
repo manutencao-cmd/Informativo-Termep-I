@@ -11,7 +11,7 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
     const receiptRef = useRef<HTMLDivElement>(null);
     const [isSharing, setIsSharing] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
-    const [base64Photos, setBase64Photos] = useState<string[]>([]);
+    const [base64Images, setBase64Images] = useState<{ url: string, id: string }[]>([]);
     const [statusText, setStatusText] = useState('');
 
     // Pre-process variables
@@ -32,15 +32,18 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
         dataStr = today.toLocaleDateString('pt-BR');
     }
 
-    // 1. Converter fotos para Base64 (Crucial para html2canvas no mobile)
+    const arquivos = data.tempAnexos && data.tempAnexos.length > 0 ? data.tempAnexos : data.arquivos || [];
+
+    // 1. Converter APENAS FOTOS para Base64 (Crucial para html2canvas no mobile)
     useEffect(() => {
         let isMounted = true;
         async function preparePhotos() {
-            const photos = data.tempPhotos && data.tempPhotos.length > 0 ? data.tempPhotos : data.fotos || [];
-            const processed: string[] = [];
+            const imageAnexos = arquivos.filter((a: any) => a.type === 'image');
+            const processed: { url: string, id: string }[] = [];
 
-            for (const url of photos) {
+            for (const anexo of imageAnexos) {
                 if (!isMounted) return;
+                const url = anexo.url;
                 if (url.startsWith('blob:') || url.startsWith('http')) {
                     try {
                         const controller = new AbortController();
@@ -56,20 +59,20 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
                             reader.onerror = reject;
                             reader.readAsDataURL(blob);
                         });
-                        processed.push(base64);
+                        processed.push({ url: base64, id: url });
                     } catch (e) {
                         console.error("Erro ao converter imagem:", e);
-                        processed.push(url);
+                        processed.push({ url, id: url });
                     }
                 } else {
-                    processed.push(url);
+                    processed.push({ url, id: url });
                 }
             }
-            if (isMounted) setBase64Photos(processed);
+            if (isMounted) setBase64Images(processed);
         }
         preparePhotos();
         return () => { isMounted = false; };
-    }, [data.tempPhotos, data.fotos]);
+    }, [data.tempAnexos, data.arquivos]);
 
     const msgWhatsappText = `*Informativo TERMEP*\n${valor !== 'Avaliação' ? `*${valor}*\n` : ''}\n👤 *Cliente:* ${cliente}\n🚜 *Equipamento:* ${veiculo} - ${placa}\n📊 *Status:* ${status}\n🔧 *Serviço:* ${servico}\n\n📅 _Gerado em ${dataStr}_`;
 
@@ -257,16 +260,48 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
                         </div>
                     </div>
 
-                    {/* Photo */}
-                    {base64Photos.length > 0 && (
-                        <div style={{ marginTop: '16px' }}>
-                            <div style={{ width: '100%', borderRadius: '16px', overflow: 'hidden', border: '1px solid #f3f4f6', backgroundColor: '#f9fafb' }}>
-                                <img
-                                    src={base64Photos[0]}
-                                    alt="Foto"
-                                    style={{ width: '100%', height: 'auto', display: 'block', margin: '0 auto', maxHeight: '600px', objectFit: 'contain' }}
-                                />
-                            </div>
+                    {/* Anexos */}
+                    {arquivos.length > 0 && (
+                        <div className="space-y-4 pt-4">
+                            {arquivos.map((anexo: any, index: number) => {
+                                if (anexo.type === 'image') {
+                                    const base64Img = base64Images.find(img => img.id === anexo.url);
+                                    return (
+                                        <div key={index} style={{ width: '100%', borderRadius: '16px', overflow: 'hidden', border: '1px solid #f3f4f6', backgroundColor: '#f9fafb' }}>
+                                            <img
+                                                src={base64Img ? base64Img.url : anexo.url}
+                                                alt={`Anexo ${index + 1}`}
+                                                style={{ width: '100%', height: 'auto', display: 'block', margin: '0 auto', maxHeight: '600px', objectFit: 'contain' }}
+                                            />
+                                        </div>
+                                    );
+                                } else if (anexo.type === 'video') {
+                                    return (
+                                        <div key={index} data-html2canvas-ignore="true" style={{ width: '100%', borderRadius: '16px', overflow: 'hidden', border: '1px solid #f3f4f6', backgroundColor: '#000' }}>
+                                            <video
+                                                src={anexo.url}
+                                                controls
+                                                style={{ width: '100%', display: 'block' }}
+                                            />
+                                        </div>
+                                    );
+                                } else if (anexo.type === 'pdf') {
+                                    return (
+                                        <div key={index} data-html2canvas-ignore="true" style={{ width: '100%', borderRadius: '12px', border: '1px solid #e5e7eb', padding: '16px', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', width: '40px', height: '40px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <Download size={20} />
+                                            </div>
+                                            <div style={{ flex: 1, overflow: 'hidden' }}>
+                                                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#374151', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{anexo.name || 'Documento PDF'}</div>
+                                                <a href={anexo.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '11px', color: '#005f73', fontWeight: '600', textDecoration: 'underline' }}>
+                                                    Visualizar PDF
+                                                </a>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })}
                         </div>
                     )}
 
