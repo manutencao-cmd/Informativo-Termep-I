@@ -196,7 +196,7 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
     };
 
     return (
-        <div className="w-full max-w-md mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20 px-4">
+        <div className="w-full max-w-xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20 px-4">
 
             {/* Recibo Visível */}
             <div
