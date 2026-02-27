@@ -17,13 +17,14 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
         const formData = new FormData(e.currentTarget);
         const data = Object.fromEntries(formData.entries());
 
-        // Validate phone
-        const phoneStr = data.telefone as string;
-        if (!/^[0-9]{10,11}$/.test(phoneStr)) {
+        // Validate and format phone
+        const rawPhone = (data.telefone as string).replace(/\D/g, '');
+        if (!/^[0-9]{10,11}$/.test(rawPhone)) {
             setErrorPhone(true);
             return;
         }
         setErrorPhone(false);
+
 
         setLoading(true);
 
@@ -49,6 +50,7 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
 
             const serviceData = {
                 ...data,
+                telefone: rawPhone,
                 valor,
                 fotos: fotosUrls,
                 tempPhotos,

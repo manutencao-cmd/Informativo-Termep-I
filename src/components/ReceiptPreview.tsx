@@ -50,7 +50,9 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
         try {
             const canvas = await html2canvas(receiptRef.current, {
                 scale: 2,
-                backgroundColor: '#f4f7f8',
+                backgroundColor: '#ffffff',
+                useCORS: true,
+                allowTaint: true,
                 logging: false
             });
 
@@ -89,7 +91,9 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
     };
 
     const fallbackWhatsApp = () => {
-        const urlWhatsapp = `https://wa.me/55${telefone}?text=${encodeURIComponent(msgWhatsapp)}`;
+        const cleanPhone = telefone.replace(/\D/g, '');
+        const finalPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+        const urlWhatsapp = `https://wa.me/${finalPhone}?text=${encodeURIComponent(msgWhatsapp)}`;
         window.open(urlWhatsapp, '_blank');
     };
 
@@ -163,12 +167,12 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
                         </div>
                     </div>
 
-                    {/* Attachments Preview - Using local ObjectURLs for the screenshot to avoid CORS issues */}
-                    {data.tempPhotos && data.tempPhotos.length > 0 && (
+                    {/* Attachments Preview */}
+                    {((data.tempPhotos && data.tempPhotos.length > 0) || (data.fotos && data.fotos.length > 0)) && (
                         <div className="mt-8 pt-6 border-t border-gray-100 border-dashed">
                             <div className="text-gray-400 text-sm font-medium mb-4 flex gap-2 items-center"><Camera size={14} /> FOTOS ANEXADAS</div>
                             <div className="grid grid-cols-2 gap-3">
-                                {data.tempPhotos.map((url: string, index: number) => (
+                                {(data.tempPhotos && data.tempPhotos.length > 0 ? data.tempPhotos : data.fotos).map((url: string, index: number) => (
                                     <img key={index} src={url} alt={`Anexo ${index + 1}`} className="w-full h-32 object-cover rounded-xl border border-gray-100" />
                                 ))}
                             </div>
