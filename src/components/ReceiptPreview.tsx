@@ -34,32 +34,41 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
 
     // 1. Converter fotos para Base64 (Crucial para html2canvas no mobile)
     useEffect(() => {
+        let isMounted = true;
         async function preparePhotos() {
             const photos = data.tempPhotos && data.tempPhotos.length > 0 ? data.tempPhotos : data.fotos || [];
             const processed: string[] = [];
 
             for (const url of photos) {
+                if (!isMounted) return;
                 if (url.startsWith('blob:') || url.startsWith('http')) {
                     try {
-                        const response = await fetch(url);
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+                        const response = await fetch(url, { signal: controller.signal });
+                        clearTimeout(timeoutId);
+
                         const blob = await response.blob();
                         const reader = new FileReader();
-                        const base64 = await new Promise<string>((resolve) => {
+                        const base64 = await new Promise<string>((resolve, reject) => {
                             reader.onloadend = () => resolve(reader.result as string);
+                            reader.onerror = reject;
                             reader.readAsDataURL(blob);
                         });
                         processed.push(base64);
                     } catch (e) {
-                        console.error("Erro ao converter imagem para base64:", e);
+                        console.error("Erro ao converter imagem:", e);
                         processed.push(url);
                     }
                 } else {
                     processed.push(url);
                 }
             }
-            setBase64Photos(processed);
+            if (isMounted) setBase64Photos(processed);
         }
         preparePhotos();
+        return () => { isMounted = false; };
     }, [data.tempPhotos, data.fotos]);
 
     const msgWhatsappText = `*Informativo TERMEP*\n${valor !== 'Avaliação' ? `*${valor}*\n` : ''}\n👤 *Cliente:* ${cliente}\n🚜 *Equipamento:* ${veiculo} - ${placa}\n📊 *Status:* ${status}\n🔧 *Serviço:* ${servico}\n\n📅 _Gerado em ${dataStr}_`;
@@ -69,33 +78,49 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
         if (!receiptRef.current) return null;
 
         try {
-            // Garantir que imagens estão carregadas
-            const images = Array.from(receiptRef.current.querySelectorAll('img'));
+            // 1. Reset scroll (Essencial para evitar cortes no html2canvas mobile)
+            const scrollY = window.scrollY;
+            window.scrollTo(0, 0);
+
+            // 2. Garantir que imagens estão carregadas
+            const images = Array.from(receiptRef.current.querySelectorAll('img')) as HTMLImageElement[];
             await Promise.all(images.map(img => {
                 if (img.complete) return Promise.resolve();
-                return new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+                return new Promise(resolve => {
+                    img.onload = resolve;
+                    img.onerror = resolve;
+                    setTimeout(resolve, 8000);
+                });
             }));
 
-            // Pequeno delay para estabilizar o layout
+            // 3. Pequeno delay para estabilizar o layout após scroll
             await new Promise(resolve => setTimeout(resolve, 500));
 
+            // 4. Capturar usando html2canvas (Scale 1.0 para estabilidade)
             const canvas = await html2canvas(receiptRef.current, {
-                scale: 1.5, // Reduzido para economizar memória no mobile
+                scale: 1,
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: "#ffffff",
-                logging: false,
-                width: receiptRef.current.offsetWidth,
-                height: receiptRef.current.offsetHeight,
+                logging: true,
+                width: receiptRef.current.scrollWidth,
+                height: receiptRef.current.scrollHeight,
+                windowWidth: receiptRef.current.scrollWidth,
+                windowHeight: receiptRef.current.scrollHeight,
             });
 
-            const dataUrl = canvas.toDataURL('image/png');
-            const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png', 0.9));
+            // 5. Restaurar o scroll do usuário
+            window.scrollTo(0, scrollY);
 
-            if (!blob) return null;
+            const dataUrl = canvas.toDataURL('image/png');
+            const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png', 0.95));
+
+            if (!blob) throw new Error("Erro ao gerar arquivo final da imagem.");
+
             return { blob, dataUrl };
-        } catch (err) {
+        } catch (err: any) {
             console.error("Erro na geração da imagem:", err);
+            alert(`Erro na Imagem: ${err.message || 'Falha de Memória'}\n\nTente fechar outras abas do navegador.`);
             return null;
         }
     };
@@ -108,7 +133,8 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
             const result = await generateImage();
 
             if (!result) {
-                throw new Error("Não foi possível gerar a imagem.");
+                // generateImage já deu o alert
+                return;
             }
 
             const file = new File([result.blob], 'informativo_termep.png', { type: 'image/png' });
@@ -120,15 +146,17 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
                     text: msgWhatsappText
                 });
             } else {
-                // Se não suportar arquivos no Share API
+                // Fallback para download + whatsapp texto
                 handleDownloadAction(result.dataUrl);
-                alert("Seu celular não permite o envio automático da imagem. O informativo foi baixado para sua galeria. Por favor, anexe-o manualmente no WhatsApp.");
+                alert("O informativo foi baixado. Por favor, anexe-o manualmente no WhatsApp.");
                 fallbackWhatsApp();
             }
         } catch (err: any) {
-            console.error(err);
-            alert("Erro ao gerar imagem. Enviando apenas as informações em texto.");
-            fallbackWhatsApp();
+            if (err.name !== 'AbortError') {
+                console.error(err);
+                alert("Erro ao compartilhar. Enviando apenas texto.");
+                fallbackWhatsApp();
+            }
         } finally {
             setIsSharing(false);
             setStatusText('');
@@ -142,11 +170,9 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
             const result = await generateImage();
             if (result) {
                 handleDownloadAction(result.dataUrl);
-            } else {
-                alert("Erro ao gerar imagem para download.");
             }
         } catch (err) {
-            alert("Erro ao baixar arquivo.");
+            alert("Erro ao realizar download.");
         } finally {
             setIsDownloading(false);
             setStatusText('');
@@ -172,12 +198,11 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
     return (
         <div className="w-full max-w-md mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20 px-4">
 
-            {/* Recibo Visível (O que o usuário vê é o que será capturado) */}
+            {/* Recibo Visível */}
             <div
                 ref={receiptRef}
                 className="bg-white rounded-3xl overflow-hidden shadow-xl border border-gray-100 flex flex-col"
             >
-                {/* Header */}
                 <div className="bg-[#005f73] px-6 py-10 text-center text-white flex flex-col items-center">
                     <h2 className="text-xs font-normal tracking-widest opacity-90 mb-2 uppercase">Informativo TERMEP</h2>
                     <div className="text-4xl font-bold tracking-tight mb-2">{valor !== 'Avaliação' ? valor : 'Serviço'}</div>
@@ -186,7 +211,6 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
                     </div>
                 </div>
 
-                {/* Info List */}
                 <div className="p-6 space-y-6">
                     <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-[#005f73] shrink-0 border border-gray-100">
@@ -216,7 +240,7 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
                             <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-0.5">Status Atual</div>
                             <div className="text-sm font-semibold text-gray-700">{status}</div>
                         </div>
-                        <div className="absolute top-1 right-0 text-[9px] text-gray-300 font-medium">
+                        <div className="absolute top-1 right-0 text-[10px] text-gray-300 font-medium">
                             {dataStr}
                         </div>
                     </div>
@@ -231,15 +255,14 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
                         </div>
                     </div>
 
-                    {/* Photo */}
                     {base64Photos.length > 0 && (
                         <div className="mt-4">
                             <div className="w-full rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
                                 <img
                                     src={base64Photos[0]}
-                                    alt="Foto do Serviço"
+                                    alt="Foto"
                                     className="w-full h-auto object-contain block mx-auto"
-                                    style={{ maxHeight: '500px' }}
+                                    style={{ maxHeight: '600px' }}
                                 />
                             </div>
                         </div>
@@ -261,7 +284,7 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
                     {isSharing ? (
                         <>
                             <Loader2 className="animate-spin" size={22} />
-                            <span>{statusText || 'Compartilhando...'}</span>
+                            <span>{statusText || 'Gerando...'}</span>
                         </>
                     ) : (
                         <>
@@ -275,26 +298,25 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
                     <button
                         onClick={handleDownload}
                         disabled={isSharing || isDownloading}
-                        className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 font-bold py-3.5 rounded-2xl hover:bg-gray-200 transition-all active:scale-95 disabled:opacity-50"
+                        className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl hover:bg-gray-200 transition-all active:scale-95 disabled:opacity-50"
                     >
                         {isDownloading ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
-                        {isDownloading ? 'Gerando...' : 'Baixar Imagem'}
+                        {isDownloading ? '...' : 'Baixar Imagem'}
                     </button>
                     <button
                         onClick={onBack}
-                        className="flex items-center justify-center gap-2 bg-white text-[#005f73] font-bold py-3.5 rounded-2xl border-2 border-[#005f73] transition-all active:scale-95"
+                        className="flex items-center justify-center gap-2 bg-white text-[#005f73] font-bold py-4 rounded-2xl border-2 border-[#005f73] transition-all active:scale-95"
                     >
                         <ArrowLeft size={18} />
-                        Novo Serviço
+                        Novo
                     </button>
                 </div>
             </div>
 
-            {/* Tip */}
-            <div className="flex gap-2 items-center justify-center p-4 bg-blue-50/50 rounded-2xl border border-blue-100/50">
-                <AlertCircle className="text-blue-400" size={16} />
-                <p className="text-[10px] text-blue-600 font-medium italic">
-                    Dica: Se o automático falhar, clique em "Baixar Imagem" e anexe no WhatsApp.
+            <div className="flex gap-2 items-center justify-center p-4 bg-orange-50 rounded-2xl border border-orange-100">
+                <AlertCircle className="text-orange-400" size={16} />
+                <p className="text-[10px] text-orange-700 font-medium italic text-center">
+                    Dica: Se o WhatsApp não abrir com a imagem, clique em "Baixar Imagem" e mande o arquivo manualmente.
                 </p>
             </div>
 
