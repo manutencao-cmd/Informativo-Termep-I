@@ -36,15 +36,24 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
             let fotosUrls: string[] = [];
             let tempPhotos: string[] = []; // Used for raw preview before Firebase is done if needed
 
-            if (files.length > 0 && storage) {
+            if (files.length > 0) {
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i];
-                    tempPhotos.push(URL.createObjectURL(file));
-                    const fileName = `oficina/${Date.now()}_${file.name}`;
-                    const storageRef = ref(storage, fileName);
-                    const snapshot = await uploadBytes(storageRef, file);
-                    const url = await getDownloadURL(snapshot.ref);
-                    fotosUrls.push(url);
+                    const localUrl = URL.createObjectURL(file);
+                    tempPhotos.push(localUrl);
+
+                    if (storage) {
+                        try {
+                            const fileName = `oficina/${Date.now()}_${file.name}`;
+                            const storageRef = ref(storage, fileName);
+                            const snapshot = await uploadBytes(storageRef, file);
+                            const url = await getDownloadURL(snapshot.ref);
+                            fotosUrls.push(url);
+                        } catch (storageErr) {
+                            console.warn("Falha no upload para o Storage (plano ou permissão):", storageErr);
+                            // Continuamos sem a URL remota, usando apenas o blob local para o preview imediato
+                        }
+                    }
                 }
             }
 

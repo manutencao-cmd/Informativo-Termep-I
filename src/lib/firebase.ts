@@ -3,12 +3,12 @@ import { getFirestore, collection, addDoc } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const firebaseConfig = {
-    apiKey: "SUA_API_KEY",
-    authDomain: "SEU_DOMINIO.firebaseapp.com",
-    projectId: "SEU_PROJECT_ID",
-    storageBucket: "SEU_BUCKET.appspot.com",
-    messagingSenderId: "SEU_SENDER_ID",
-    appId: "SEU_APP_ID"
+    apiKey: "AIzaSyBCyJok77Y5Hmt2MN2MF1CEbMcKt0VvqN0",
+    authDomain: "informativo-termep.firebaseapp.com",
+    projectId: "informativo-termep",
+    storageBucket: "informativo-termep.firebasestorage.app",
+    messagingSenderId: "441247695636",
+    appId: "1:441247695636:web:a478174d1c32920a763801"
 };
 
 let db: ReturnType<typeof getFirestore> | null = null;
