@@ -43,55 +43,77 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
         setIsSharing(true);
 
         try {
-            // Pequeno delay para garantir que imagens (blobs) estejam renderizadas
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // 1. Garantir que as imagens dentro do recibo estão totalmente carregadas
+            const images = Array.from(receiptRef.current.querySelectorAll('img')) as HTMLImageElement[];
+            const promises = images.map(img => {
+                if (img.complete) return Promise.resolve();
+                return new Promise(resolve => {
+                    img.onload = resolve;
+                    img.onerror = resolve; // Continua mesmo se uma imagem falhar
+                });
+            });
+            await Promise.all(promises);
+
+            // 2. Pequeno delay extra para garantir renderização estável
+            await new Promise(resolve => setTimeout(resolve, 800));
 
             const canvas = await html2canvas(receiptRef.current, {
-                scale: 2, // Aumenta qualidade
+                scale: 2,
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: "#ffffff",
                 logging: false,
-                windowWidth: receiptRef.current.scrollWidth,
-                windowHeight: receiptRef.current.scrollHeight
+                // Forçar dimensões para evitar cortes
+                width: receiptRef.current.offsetWidth,
+                height: receiptRef.current.offsetHeight,
+                onclone: (doc) => {
+                    // Garantir que elementos clonados estejam visíveis
+                    const element = doc.querySelector('[ref="receiptRef"]') as HTMLElement;
+                    if (element) element.style.display = 'block';
+                }
             });
 
-            const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
-            if (!blob) throw new Error("Erro ao gerar imagem.");
+            const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png', 0.95));
+            if (!blob) throw new Error("Falha ao gerar o arquivo de imagem.");
 
             const file = new File([blob], 'informativo_termep.png', { type: 'image/png' });
 
-            // Tenta compartilhar o arquivo (Melhor para mobile)
+            // 3. Tentar compartilhar o arquivo (Ideal para Mobile)
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                    files: [file],
-                    title: 'Informativo TERMEP',
-                    text: msgWhatsapp
-                });
-            } else {
-                // Se não suportar arquivos, tenta compartilhar texto ou baixa a imagem
-                if (navigator.share) {
+                try {
                     await navigator.share({
+                        files: [file],
                         title: 'Informativo TERMEP',
                         text: msgWhatsapp
                     });
+                    setIsSharing(false);
+                    return; // Sucesso!
+                } catch (shareErr: any) {
+                    if (shareErr.name === 'AbortError') {
+                        setIsSharing(false);
+                        return; // Usuário cancelou, não faz fallback
+                    }
+                    console.warn("Share API falhou, tentando fallback...", shareErr);
                 }
-
-                // Fallback de download para garantir que ele tenha a imagem
-                const link = document.createElement('a');
-                link.download = `TERMEP_${cliente.replace(/\s+/g, '_')}.png`;
-                link.href = canvas.toDataURL('image/png');
-                link.click();
-
-                // Abre o WhatsApp com o texto
-                fallbackWhatsApp();
             }
+
+            // 4. Fallback: Se não conseguir compartilhar o arquivo diretamente
+            // Baixa a imagem para o celular e abre o WhatsApp com o texto
+            const imageUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = imageUrl;
+            link.download = `TERMEP_${cliente.replace(/\s+/g, '_')}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            alert("Sua imagem foi baixada automaticamente! Agora, basta anexá-la na conversa do WhatsApp que irá abrir.");
+            fallbackWhatsApp();
+
         } catch (error: any) {
-            console.error("Erro no compartilhamento:", error);
-            if (error.name !== 'AbortError') {
-                alert("Não foi possível compartilhar a imagem automaticamente. Tentando enviar apenas texto...");
-                fallbackWhatsApp();
-            }
+            console.error("Erro crítico no compartilhamento:", error);
+            alert("Não foi possível gerar a imagem. Enviando apenas as informações em texto...");
+            fallbackWhatsApp();
         } finally {
             setIsSharing(false);
         }
