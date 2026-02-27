@@ -29,63 +29,70 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
         dataStr = today.toLocaleDateString('pt-BR');
     }
 
-    // Pre-process Whatsapp message
+    // Pre-process Whatsapp message (Fallback Text)
     let msgWhatsapp = `*Informativo TERMEP*\n`;
-    if (data.valor !== '0.00') msgWhatsapp += `*${valor}*\n`;
-    else msgWhatsapp += `*Status do Serviço*\n`;
-    msgWhatsapp += `_Acompanhamento do seu equipamento_\n\n`;
-    msgWhatsapp += `👤 *Cliente*\n${cliente}\n\n`;
-    msgWhatsapp += `🚜 *Equipamento*\n${veiculo} - ${placa}\n\n`;
-    msgWhatsapp += `📊 *Status Atual*\n${status}\n_${dataStr}_\n\n`;
-    msgWhatsapp += `🔧 *Serviço Realizado*\n${servico}\n`;
-
-    if (data.fotos && data.fotos.length > 0) {
-        msgWhatsapp += `\n📸 *Fotos do Serviço*\n${data.fotos.join('\n')}`;
-    }
+    if (data.valor !== '0.00' && data.valor !== 'Avaliação') msgWhatsapp += `*${valor}*\n`;
+    msgWhatsapp += `\n👤 *Cliente:* ${cliente}\n`;
+    msgWhatsapp += `🚜 *Equipamento:* ${veiculo} - ${placa}\n`;
+    msgWhatsapp += `📊 *Status:* ${status}\n`;
+    msgWhatsapp += `🔧 *Serviço:* ${servico}\n`;
+    msgWhatsapp += `\n📅 _Gerado em ${dataStr}_`;
 
     const handleShare = async () => {
         if (!receiptRef.current) return;
         setIsSharing(true);
 
         try {
+            // Pequeno delay para garantir que imagens (blobs) estejam renderizadas
+            await new Promise(resolve => setTimeout(resolve, 500));
+
             const canvas = await html2canvas(receiptRef.current, {
-                scale: 2,
-                backgroundColor: '#ffffff',
+                scale: 2, // Aumenta qualidade
                 useCORS: true,
                 allowTaint: true,
-                logging: false
+                backgroundColor: "#ffffff",
+                logging: false,
+                windowWidth: receiptRef.current.scrollWidth,
+                windowHeight: receiptRef.current.scrollHeight
             });
 
-            canvas.toBlob(async (blob) => {
-                if (!blob) throw new Error("Falha ao gerar blob da imagem.");
-                const file = new File([blob], 'status_servico.png', { type: 'image/png' });
+            const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
+            if (!blob) throw new Error("Erro ao gerar imagem.");
 
-                if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                    try {
-                        await navigator.share({
-                            title: 'Status do Serviço',
-                            text: msgWhatsapp,
-                            files: [file]
-                        });
-                    } catch (err) {
-                        console.log('Compartilhamento nativo falhou ou foi cancelado', err);
-                        fallbackWhatsApp();
-                    }
-                } else {
-                    fallbackWhatsApp();
+            const file = new File([blob], 'informativo_termep.png', { type: 'image/png' });
 
-                    // Optional download for desktop
-                    const link = document.createElement('a');
-                    link.download = `TERMEP_${cliente.replace(/\s+/g, '')}.png`;
-                    link.href = canvas.toDataURL('image/png');
-                    link.click();
+            // Tenta compartilhar o arquivo (Melhor para mobile)
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: 'Informativo TERMEP',
+                    text: msgWhatsapp
+                });
+            } else {
+                // Se não suportar arquivos, tenta compartilhar texto ou baixa a imagem
+                if (navigator.share) {
+                    await navigator.share({
+                        title: 'Informativo TERMEP',
+                        text: msgWhatsapp
+                    });
                 }
-                setIsSharing(false);
-            }, 'image/png');
 
-        } catch (error) {
-            console.error("Erro ao gerar imagem:", error);
-            fallbackWhatsApp();
+                // Fallback de download para garantir que ele tenha a imagem
+                const link = document.createElement('a');
+                link.download = `TERMEP_${cliente.replace(/\s+/g, '_')}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+
+                // Abre o WhatsApp com o texto
+                fallbackWhatsApp();
+            }
+        } catch (error: any) {
+            console.error("Erro no compartilhamento:", error);
+            if (error.name !== 'AbortError') {
+                alert("Não foi possível compartilhar a imagem automaticamente. Tentando enviar apenas texto...");
+                fallbackWhatsApp();
+            }
+        } finally {
             setIsSharing(false);
         }
     };
