@@ -43,6 +43,7 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
         setIsSharing(true);
 
         try {
+            console.log("Iniciando captura do recibo...");
             // 1. Garantir que as imagens dentro do recibo estão totalmente carregadas
             const images = Array.from(receiptRef.current.querySelectorAll('img')) as HTMLImageElement[];
             const promises = images.map(img => {
@@ -62,16 +63,21 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: "#ffffff",
-                logging: false,
+                logging: true,
                 // Forçar dimensões para evitar cortes
                 width: receiptRef.current.offsetWidth,
                 height: receiptRef.current.offsetHeight,
+                scrollX: 0,
+                scrollY: -window.scrollY,
                 onclone: (doc) => {
-                    // Garantir que elementos clonados estejam visíveis
-                    const element = doc.querySelector('[ref="receiptRef"]') as HTMLElement;
-                    if (element) element.style.display = 'block';
+                    const clone = doc.getElementById('receipt-capture');
+                    if (clone) {
+                        clone.style.display = 'block';
+                    }
                 }
             });
+
+            console.log("Canvas gerado com sucesso.");
 
             const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png', 0.95));
             if (!blob) throw new Error("Falha ao gerar o arquivo de imagem.");
@@ -132,6 +138,7 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
             {/* Target for html2canvas */}
             <div
                 ref={receiptRef}
+                id="receipt-capture"
                 className="bg-white rounded-3xl overflow-hidden shadow-xl border border-gray-100 flex flex-col"
             >
                 {/* Header Section (Novo Design) */}
