@@ -32,16 +32,11 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
         dataStr = today.toLocaleDateString('pt-BR');
     }
 
-    // Unificar arquivos temporários e permanentes
-    // Se um arquivo já tem URL permanente, usamos ela. Caso contrário, usamos a temporária.
-    const anexosFinais = [...(data.arquivos || [])];
-    if (data.tempAnexos) {
-        data.tempAnexos.forEach((temp: any) => {
-            const jaExiste = anexosFinais.some(f => f.name === temp.name);
-            if (!jaExiste) anexosFinais.push(temp);
-        });
-    }
-    const arquivos = anexosFinais;
+    // Usar tempAnexos para exibição visual no preview (blobs funcionam localmente)
+    const arquivos = data.tempAnexos || data.arquivos || [];
+
+    // Arquivos originais (File objects) para compartilhamento direto
+    const originalFiles: File[] = data.originalFiles || [];
 
     // 1. Converter APENAS FOTOS para Base64 (Crucial para html2canvas no mobile)
     useEffect(() => {
@@ -83,12 +78,7 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
         return () => { isMounted = false; };
     }, [data.tempAnexos, data.arquivos]);
 
-    const linksAnexos = arquivos
-        .filter((a: any) => a.type !== 'image' && a.url && !a.url.startsWith('blob:'))
-        .map((a: any) => `\n🔗 *${a.type === 'video' ? 'Vídeo' : 'PDF'}:* ${a.url}`)
-        .join('');
-
-    const msgWhatsappText = `*Informativo TERMEP*\n${valor !== 'Avaliação' ? `*${valor}*\n` : ''}\n👤 *Cliente:* ${cliente}\n🚜 *Equipamento:* ${veiculo} - ${placa}\n📊 *Status:* ${status}\n🔧 *Serviço:* ${servico}${linksAnexos}\n\n📅 _Gerado em ${dataStr}_`;
+    const msgWhatsappText = `*Informativo TERMEP*\n${valor !== 'Avaliação' ? `*${valor}*\n` : ''}\n👤 *Cliente:* ${cliente}\n🚜 *Equipamento:* ${veiculo} - ${placa}\n📊 *Status:* ${status}\n🔧 *Serviço:* ${servico}\n\n📅 _Gerado em ${dataStr}_`;
 
     // Função universal de captura
     const generateImage = async (): Promise<{ blob: Blob, dataUrl: string } | null> => {
@@ -150,20 +140,33 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
             const result = await generateImage();
 
             if (!result) {
-                // generateImage já deu o alert
                 return;
             }
 
-            const file = new File([result.blob], 'informativo_termep.png', { type: 'image/png' });
+            // Montar lista de arquivos para compartilhar:
+            // 1. Imagem do informativo
+            // 2. PDFs e Vídeos originais do usuário
+            const informativoFile = new File([result.blob], 'informativo_termep.png', { type: 'image/png' });
+            const filesToShare: File[] = [informativoFile];
 
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            // Adicionar PDFs e Vídeos originais
+            const extraFiles = originalFiles.filter(f => !f.type.startsWith('image/'));
+            filesToShare.push(...extraFiles);
+
+            if (navigator.canShare && navigator.canShare({ files: filesToShare })) {
                 await navigator.share({
-                    files: [file],
+                    files: filesToShare,
+                    title: 'Informativo TERMEP',
+                    text: msgWhatsappText
+                });
+            } else if (navigator.canShare && navigator.canShare({ files: [informativoFile] })) {
+                // Fallback: tentar compartilhar só a imagem se não aceitar múltiplos
+                await navigator.share({
+                    files: [informativoFile],
                     title: 'Informativo TERMEP',
                     text: msgWhatsappText
                 });
             } else {
-                // Fallback para download + whatsapp texto
                 handleDownloadAction(result.dataUrl);
                 alert("O informativo foi baixado. Por favor, anexe-o manualmente no WhatsApp.");
                 fallbackWhatsApp();

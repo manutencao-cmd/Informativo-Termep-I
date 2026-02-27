@@ -93,7 +93,8 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
             }
 
             setStatus('Concluído!');
-            onSuccess({ ...serviceData, data: new Date() });
+            // Passamos os arquivos File originais para o preview poder compartilhá-los diretamente
+            onSuccess({ ...serviceData, data: new Date(), originalFiles: files });
         } catch (err: any) {
             console.error("Erro no formulário:", err);
             alert(`Erro: ${err.message || 'Falha ao salvar'}. Verifique sua conexão.`);
