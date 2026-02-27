@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { User, Car, Activity, Wrench, Share2, ArrowLeft, Loader2, Camera, Download } from 'lucide-react';
+import { User, Car, Activity, Wrench, Share2, ArrowLeft, Loader2, Download, AlertCircle } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 interface ReceiptPreviewProps {
@@ -10,10 +10,9 @@ interface ReceiptPreviewProps {
 export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
     const receiptRef = useRef<HTMLDivElement>(null);
     const [isSharing, setIsSharing] = useState(false);
-    const [isCapturing, setIsCapturing] = useState(true);
-    const [capturedImage, setCapturedImage] = useState<string | null>(null);
-    const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
+    const [isDownloading, setIsDownloading] = useState(false);
     const [base64Photos, setBase64Photos] = useState<string[]>([]);
+    const [statusText, setStatusText] = useState('');
 
     // Pre-process variables
     const cliente = data.cliente || '';
@@ -33,14 +32,14 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
         dataStr = today.toLocaleDateString('pt-BR');
     }
 
-    // 1. Converter fotos para Base64 (Evita bugs com Blob no html2canvas)
+    // 1. Converter fotos para Base64 (Crucial para html2canvas no mobile)
     useEffect(() => {
         async function preparePhotos() {
             const photos = data.tempPhotos && data.tempPhotos.length > 0 ? data.tempPhotos : data.fotos || [];
             const processed: string[] = [];
 
             for (const url of photos) {
-                if (url.startsWith('blob:')) {
+                if (url.startsWith('blob:') || url.startsWith('http')) {
                     try {
                         const response = await fetch(url);
                         const blob = await response.blob();
@@ -51,7 +50,7 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
                         });
                         processed.push(base64);
                     } catch (e) {
-                        console.error("Erro ao converter blob para base64:", e);
+                        console.error("Erro ao converter imagem para base64:", e);
                         processed.push(url);
                     }
                 } else {
@@ -63,74 +62,100 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
         preparePhotos();
     }, [data.tempPhotos, data.fotos]);
 
-    // 2. Captura automática quando as fotos base64 estiverem prontas
-    useEffect(() => {
-        if (base64Photos.length >= 0 && isCapturing && !capturedImage) {
-            // Pequeno delay para garantir renderização do DOM
-            const timer = setTimeout(async () => {
-                if (receiptRef.current) {
-                    try {
-                        const canvas = await html2canvas(receiptRef.current, {
-                            scale: 2,
-                            useCORS: true,
-                            allowTaint: true,
-                            backgroundColor: "#ffffff",
-                            logging: false,
-                        });
+    const msgWhatsappText = `*Informativo TERMEP*\n${valor !== 'Avaliação' ? `*${valor}*\n` : ''}\n👤 *Cliente:* ${cliente}\n🚜 *Equipamento:* ${veiculo} - ${placa}\n📊 *Status:* ${status}\n🔧 *Serviço:* ${servico}\n\n📅 _Gerado em ${dataStr}_`;
 
-                        const dataUrl = canvas.toDataURL('image/png');
-                        setCapturedImage(dataUrl);
-
-                        canvas.toBlob((blob) => {
-                            setCapturedBlob(blob);
-                            setIsCapturing(false);
-                        }, 'image/png', 0.95);
-                    } catch (err) {
-                        console.error("Erro na captura automática:", err);
-                        setIsCapturing(false);
-                    }
-                }
-            }, 1000);
-            return () => clearTimeout(timer);
-        }
-    }, [base64Photos, isCapturing, capturedImage]);
-
-    // Message context for text fallback
-    const msgWhatsapp = `*Informativo TERMEP*\n${valor !== 'Avaliação' ? `*${valor}*\n` : ''}\n👤 *Cliente:* ${cliente}\n🚜 *Equipamento:* ${veiculo} - ${placa}\n📊 *Status:* ${status}\n🔧 *Serviço:* ${servico}\n\n📅 _Gerado em ${dataStr}_`;
-
-    const handleShare = async () => {
-        if (!capturedBlob || !capturedImage) {
-            alert("Aguarde o processamento da imagem...");
-            return;
-        }
-
-        setIsSharing(true);
-        const file = new File([capturedBlob], 'informativo_termep.png', { type: 'image/png' });
+    // Função universal de captura
+    const generateImage = async (): Promise<{ blob: Blob, dataUrl: string } | null> => {
+        if (!receiptRef.current) return null;
 
         try {
+            // Garantir que imagens estão carregadas
+            const images = Array.from(receiptRef.current.querySelectorAll('img'));
+            await Promise.all(images.map(img => {
+                if (img.complete) return Promise.resolve();
+                return new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+            }));
+
+            // Pequeno delay para estabilizar o layout
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const canvas = await html2canvas(receiptRef.current, {
+                scale: 1.5, // Reduzido para economizar memória no mobile
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: "#ffffff",
+                logging: false,
+                width: receiptRef.current.offsetWidth,
+                height: receiptRef.current.offsetHeight,
+            });
+
+            const dataUrl = canvas.toDataURL('image/png');
+            const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png', 0.9));
+
+            if (!blob) return null;
+            return { blob, dataUrl };
+        } catch (err) {
+            console.error("Erro na geração da imagem:", err);
+            return null;
+        }
+    };
+
+    const handleShare = async () => {
+        setIsSharing(true);
+        setStatusText('Gerando informativo...');
+
+        try {
+            const result = await generateImage();
+
+            if (!result) {
+                throw new Error("Não foi possível gerar a imagem.");
+            }
+
+            const file = new File([result.blob], 'informativo_termep.png', { type: 'image/png' });
+
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({
                     files: [file],
                     title: 'Informativo TERMEP',
-                    text: msgWhatsapp
+                    text: msgWhatsappText
                 });
             } else {
-                throw new Error("Share not supported");
-            }
-        } catch (error: any) {
-            if (error.name !== 'AbortError') {
-                handleDownload();
+                // Se não suportar arquivos no Share API
+                handleDownloadAction(result.dataUrl);
+                alert("Seu celular não permite o envio automático da imagem. O informativo foi baixado para sua galeria. Por favor, anexe-o manualmente no WhatsApp.");
                 fallbackWhatsApp();
             }
+        } catch (err: any) {
+            console.error(err);
+            alert("Erro ao gerar imagem. Enviando apenas as informações em texto.");
+            fallbackWhatsApp();
         } finally {
             setIsSharing(false);
+            setStatusText('');
         }
     };
 
-    const handleDownload = () => {
-        if (!capturedImage) return;
+    const handleDownload = async () => {
+        setIsDownloading(true);
+        setStatusText('Baixando...');
+        try {
+            const result = await generateImage();
+            if (result) {
+                handleDownloadAction(result.dataUrl);
+            } else {
+                alert("Erro ao gerar imagem para download.");
+            }
+        } catch (err) {
+            alert("Erro ao baixar arquivo.");
+        } finally {
+            setIsDownloading(false);
+            setStatusText('');
+        }
+    };
+
+    const handleDownloadAction = (dataUrl: string) => {
         const link = document.createElement('a');
-        link.href = capturedImage;
+        link.href = dataUrl;
         link.download = `TERMEP_${cliente.replace(/\s+/g, '_')}.png`;
         document.body.appendChild(link);
         link.click();
@@ -140,144 +165,138 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
     const fallbackWhatsApp = () => {
         const cleanPhone = telefone.replace(/\D/g, '');
         const finalPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-        const urlWhatsapp = `https://wa.me/${finalPhone}?text=${encodeURIComponent(msgWhatsapp)}`;
+        const urlWhatsapp = `https://wa.me/${finalPhone}?text=${encodeURIComponent(msgWhatsappText)}`;
         window.open(urlWhatsapp, '_blank');
     };
 
     return (
         <div className="w-full max-w-md mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20 px-4">
 
-            {/* Stage 1: Invisible Capture Target */}
-            <div className="fixed -left-[9999px] top-0 overflow-hidden">
-                <div
-                    ref={receiptRef}
-                    id="receipt-capture"
-                    className="bg-white w-[375px] overflow-hidden flex flex-col"
-                >
-                    <div className="bg-[#005f73] px-6 py-10 text-center text-white flex flex-col items-center">
-                        <h2 className="text-sm font-normal tracking-wide opacity-90 mb-2 uppercase">Informativo TERMEP</h2>
-                        <div className="text-4xl font-bold tracking-tight mb-2">{valor !== 'Avaliação' ? valor : 'Status do Serviço'}</div>
-                        <div className="text-xs font-light opacity-80 uppercase tracking-widest">
-                            {valor !== 'Avaliação' ? 'Status do Serviço' : ''}
-                        </div>
-                    </div>
-
-                    <div className="p-6 space-y-6 bg-white">
-                        <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
-                                <User size={20} />
-                            </div>
-                            <div className="flex-1">
-                                <div className="text-[10px] font-bold text-gray-800 uppercase leading-none mb-1">Cliente</div>
-                                <div className="text-sm text-gray-600 font-medium">{cliente}</div>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
-                                <Car size={20} />
-                            </div>
-                            <div className="flex-1">
-                                <div className="text-[10px] font-bold text-gray-800 uppercase leading-none mb-1">Equipamento</div>
-                                <div className="text-sm text-gray-600 font-medium">{veiculo} - {placa}</div>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-4 relative">
-                            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
-                                <Activity size={20} />
-                            </div>
-                            <div className="flex-1">
-                                <div className="text-[10px] font-bold text-gray-800 uppercase leading-none mb-1">Status Atual</div>
-                                <div className="text-sm text-gray-600 font-medium">{status}</div>
-                            </div>
-                            <div className="absolute top-0 right-0 text-[10px] text-gray-400 font-medium">
-                                {dataStr}
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
-                                <Wrench size={20} />
-                            </div>
-                            <div className="flex-1">
-                                <div className="text-[10px] font-bold text-gray-800 uppercase leading-none mb-1">Serviço Realizado</div>
-                                <div className="text-sm text-gray-600 leading-snug font-medium">{servico}</div>
-                            </div>
-                        </div>
-
-                        {base64Photos.length > 0 && (
-                            <div className="mt-4">
-                                <div className="w-full rounded-2xl overflow-hidden border border-gray-100">
-                                    <img
-                                        src={base64Photos[0]}
-                                        alt="Foto"
-                                        className="w-full h-auto object-contain block mx-auto"
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="pt-4 text-center">
-                            <p className="text-[8px] text-gray-300 uppercase tracking-tighter">Comprovante Digital TERMEP</p>
-                        </div>
+            {/* Recibo Visível (O que o usuário vê é o que será capturado) */}
+            <div
+                ref={receiptRef}
+                className="bg-white rounded-3xl overflow-hidden shadow-xl border border-gray-100 flex flex-col"
+            >
+                {/* Header */}
+                <div className="bg-[#005f73] px-6 py-10 text-center text-white flex flex-col items-center">
+                    <h2 className="text-xs font-normal tracking-widest opacity-90 mb-2 uppercase">Informativo TERMEP</h2>
+                    <div className="text-4xl font-bold tracking-tight mb-2">{valor !== 'Avaliação' ? valor : 'Serviço'}</div>
+                    <div className="text-[10px] font-light opacity-70 uppercase tracking-[0.2em]">
+                        {valor !== 'Avaliação' ? 'Status do Serviço' : 'Status do Equipamento'}
                     </div>
                 </div>
-            </div>
 
-            {/* Stage 2: User Preview */}
-            <div className="text-center">
-                <h3 className="text-lg font-bold text-[#005f73] mb-1">Seu Informativo Digital</h3>
-                <p className="text-xs text-gray-500">Confira abaixo o arquivo que será enviado</p>
-            </div>
+                {/* Info List */}
+                <div className="p-6 space-y-6">
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-[#005f73] shrink-0 border border-gray-100">
+                            <User size={18} />
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-0.5">Cliente</div>
+                            <div className="text-sm font-semibold text-gray-700">{cliente}</div>
+                        </div>
+                    </div>
 
-            <div className="relative group">
-                {isCapturing ? (
-                    <div className="w-full aspect-[3/4] bg-white rounded-3xl flex flex-col items-center justify-center border-2 border-dashed border-gray-200">
-                        <Loader2 className="animate-spin text-[#005f73] mb-3" size={40} />
-                        <p className="text-sm font-medium text-gray-500 animate-pulse">Gerando imagem...</p>
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-[#005f73] shrink-0 border border-gray-100">
+                            <Car size={18} />
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-0.5">Equipamento</div>
+                            <div className="text-sm font-semibold text-gray-700">{veiculo} - {placa}</div>
+                        </div>
                     </div>
-                ) : capturedImage ? (
-                    <div className="shadow-2xl rounded-3xl overflow-hidden border border-gray-100">
-                        <img src={capturedImage} alt="Preview do Recibo" className="w-full h-auto block" />
+
+                    <div className="flex items-center gap-4 relative">
+                        <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-[#005f73] shrink-0 border border-gray-100">
+                            <Activity size={18} />
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-0.5">Status Atual</div>
+                            <div className="text-sm font-semibold text-gray-700">{status}</div>
+                        </div>
+                        <div className="absolute top-1 right-0 text-[9px] text-gray-300 font-medium">
+                            {dataStr}
+                        </div>
                     </div>
-                ) : (
-                    <div className="w-full p-8 text-center bg-red-50 text-red-600 rounded-3xl">
-                        Erro ao gerar visualização. Tente novamente.
+
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-[#005f73] shrink-0 border border-gray-100">
+                            <Wrench size={18} />
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-0.5">Serviço Realizado</div>
+                            <div className="text-sm font-medium text-gray-600 leading-snug">{servico}</div>
+                        </div>
                     </div>
-                )}
+
+                    {/* Photo */}
+                    {base64Photos.length > 0 && (
+                        <div className="mt-4">
+                            <div className="w-full rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
+                                <img
+                                    src={base64Photos[0]}
+                                    alt="Foto do Serviço"
+                                    className="w-full h-auto object-contain block mx-auto"
+                                    style={{ maxHeight: '500px' }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="pt-4 text-center border-t border-gray-50">
+                        <p className="text-[9px] text-gray-300 font-medium uppercase tracking-widest italic">Digitalizado por Termep</p>
+                    </div>
+                </div>
             </div>
 
             {/* Actions */}
-            {!isCapturing && (
-                <div className="flex flex-col gap-3">
-                    <button
-                        onClick={handleShare}
-                        disabled={isSharing}
-                        className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition-all disabled:opacity-70"
-                    >
-                        {isSharing ? <Loader2 className="animate-spin" size={22} /> : <Share2 size={22} />}
-                        Compartilhar no WhatsApp
-                    </button>
+            <div className="flex flex-col gap-3">
+                <button
+                    onClick={handleShare}
+                    disabled={isSharing || isDownloading}
+                    className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition-all disabled:opacity-75"
+                >
+                    {isSharing ? (
+                        <>
+                            <Loader2 className="animate-spin" size={22} />
+                            <span>{statusText || 'Compartilhando...'}</span>
+                        </>
+                    ) : (
+                        <>
+                            <Share2 size={22} />
+                            <span>Compartilhar no WhatsApp</span>
+                        </>
+                    )}
+                </button>
 
-                    <div className="grid grid-cols-2 gap-3">
-                        <button
-                            onClick={handleDownload}
-                            className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 font-bold py-3 rounded-xl hover:bg-gray-200 transition-all active:scale-95"
-                        >
-                            <Download size={18} />
-                            Baixar Imagem
-                        </button>
-                        <button
-                            onClick={onBack}
-                            className="flex items-center justify-center gap-2 bg-white text-[#005f73] font-bold py-3 rounded-xl border-2 border-[#005f73] transition-all active:scale-95"
-                        >
-                            <ArrowLeft size={18} />
-                            Novo
-                        </button>
-                    </div>
+                <div className="grid grid-cols-2 gap-3">
+                    <button
+                        onClick={handleDownload}
+                        disabled={isSharing || isDownloading}
+                        className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 font-bold py-3.5 rounded-2xl hover:bg-gray-200 transition-all active:scale-95 disabled:opacity-50"
+                    >
+                        {isDownloading ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
+                        {isDownloading ? 'Gerando...' : 'Baixar Imagem'}
+                    </button>
+                    <button
+                        onClick={onBack}
+                        className="flex items-center justify-center gap-2 bg-white text-[#005f73] font-bold py-3.5 rounded-2xl border-2 border-[#005f73] transition-all active:scale-95"
+                    >
+                        <ArrowLeft size={18} />
+                        Novo Serviço
+                    </button>
                 </div>
-            )}
+            </div>
+
+            {/* Tip */}
+            <div className="flex gap-2 items-center justify-center p-4 bg-blue-50/50 rounded-2xl border border-blue-100/50">
+                <AlertCircle className="text-blue-400" size={16} />
+                <p className="text-[10px] text-blue-600 font-medium italic">
+                    Dica: Se o automático falhar, clique em "Baixar Imagem" e anexe no WhatsApp.
+                </p>
+            </div>
 
         </div>
     );
