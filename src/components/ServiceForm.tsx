@@ -8,6 +8,7 @@ interface ServiceFormProps {
 
 export function ServiceForm({ onSuccess }: ServiceFormProps) {
     const [loading, setLoading] = useState(false);
+    const [status, setStatus] = useState('');
     const [errorPhone, setErrorPhone] = useState(false);
     const [files, setFiles] = useState<File[]>([]);
 
@@ -25,6 +26,7 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
         setErrorPhone(false);
 
         setLoading(true);
+        setStatus('Validando dados...');
 
         try {
             const valorInput = data.valor as string;
@@ -35,6 +37,7 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
             let tempPhotos: string[] = [];
 
             if (files.length > 0) {
+                setStatus(`Processando ${files.length} foto(s)...`);
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i];
                     const localUrl = URL.createObjectURL(file);
@@ -42,18 +45,28 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
 
                     if (storage) {
                         try {
+                            setStatus(`Enviando foto ${i + 1} de ${files.length}...`);
                             const fileName = `oficina/${Date.now()}_${file.name}`;
                             const storageRef = ref(storage, fileName);
-                            const snapshot = await uploadBytes(storageRef, file);
+
+                            // Timeout para o upload não travar o app
+                            const uploadPromise = uploadBytes(storageRef, file);
+                            const timeoutPromise = new Promise((_, reject) =>
+                                setTimeout(() => reject(new Error("Timeout no upload")), 15000)
+                            );
+
+                            const snapshot = await Promise.race([uploadPromise, timeoutPromise]) as any;
                             const url = await getDownloadURL(snapshot.ref);
                             fotosUrls.push(url);
                         } catch (storageErr) {
-                            console.warn("Falha no upload para o Storage (plano ou permissão):", storageErr);
+                            console.warn("Falha no upload para o Storage:", storageErr);
+                            // Continua sem a foto no storage, usará o blob local
                         }
                     }
                 }
             }
 
+            setStatus('Salvando informações...');
             const serviceData = {
                 ...data,
                 telefone: rawPhone,
@@ -64,15 +77,22 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
             };
 
             if (db) {
-                await addDoc(collection(db, "servicos"), serviceData);
+                // Timeout para o banco de dados
+                const dbPromise = addDoc(collection(db, "servicos"), serviceData);
+                const dbTimeout = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error("Erro de conexão com banco")), 10000)
+                );
+                await Promise.race([dbPromise, dbTimeout]);
             }
 
+            setStatus('Concluído!');
             onSuccess({ ...serviceData, data: new Date() });
-        } catch (err) {
-            console.error(err);
-            alert("Erro ao salvar. Verifique o console.");
+        } catch (err: any) {
+            console.error("Erro no formulário:", err);
+            alert(`Erro: ${err.message || 'Falha ao salvar'}. Verifique sua conexão.`);
         } finally {
             setLoading(false);
+            setStatus('');
         }
     };
 
@@ -157,8 +177,13 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
                         disabled={loading}
                         className="w-full bg-[#005f73] text-white font-bold text-lg py-3 rounded-md hover:bg-[#004d5d] transition-colors shadow-sm disabled:opacity-70"
                     >
-                        {loading ? "Salvando..." : "Salvar"}
+                        {loading ? (status || "Salvando...") : "Salvar"}
                     </button>
+                    {loading && (
+                        <p className="text-center text-sm text-gray-500 mt-2 animate-pulse">
+                            Não feche a página...
+                        </p>
+                    )}
                 </div>
             </form>
         </div>
