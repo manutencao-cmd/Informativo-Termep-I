@@ -74,7 +74,12 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
         return () => { isMounted = false; };
     }, [data.tempAnexos, data.arquivos]);
 
-    const msgWhatsappText = `*Informativo TERMEP*\n${valor !== 'Avaliação' ? `*${valor}*\n` : ''}\n👤 *Cliente:* ${cliente}\n🚜 *Equipamento:* ${veiculo} - ${placa}\n📊 *Status:* ${status}\n🔧 *Serviço:* ${servico}\n\n📅 _Gerado em ${dataStr}_`;
+    const linksAnexos = arquivos
+        .filter((a: any) => a.type !== 'image')
+        .map((a: any) => `\n🔗 *${a.type === 'video' ? 'Vídeo' : 'PDF'}:* ${a.url}`)
+        .join('');
+
+    const msgWhatsappText = `*Informativo TERMEP*\n${valor !== 'Avaliação' ? `*${valor}*\n` : ''}\n👤 *Cliente:* ${cliente}\n🚜 *Equipamento:* ${veiculo} - ${placa}\n📊 *Status:* ${status}\n🔧 *Serviço:* ${servico}${linksAnexos}\n\n📅 _Gerado em ${dataStr}_`;
 
     // Função universal de captura
     const generateImage = async (): Promise<{ blob: Blob, dataUrl: string } | null> => {
@@ -287,7 +292,7 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
                                     );
                                 } else if (anexo.type === 'pdf') {
                                     return (
-                                        <div key={index} data-html2canvas-ignore="true" style={{ width: '100%', borderRadius: '12px', border: '1px solid #e5e7eb', padding: '16px', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <div key={index} style={{ width: '100%', borderRadius: '12px', border: '1px solid #e5e7eb', padding: '16px', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                             <div style={{ backgroundColor: '#fee2e2', color: '#dc2626', width: '40px', height: '40px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                 <Download size={20} />
                                             </div>
