@@ -201,75 +201,77 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
             {/* Recibo Visível */}
             <div
                 ref={receiptRef}
-                className="bg-white rounded-3xl overflow-hidden shadow-xl border border-gray-100 flex flex-col"
+                style={{ backgroundColor: '#ffffff', borderRadius: '24px', overflow: 'hidden', display: 'flex', flexDirection: 'column', border: '1px solid #f3f4f6' }}
             >
-                <div className="bg-[#005f73] px-6 py-10 text-center text-white flex flex-col items-center">
-                    <h2 className="text-xs font-normal tracking-widest opacity-90 mb-2 uppercase">Informativo TERMEP</h2>
-                    <div className="text-4xl font-bold tracking-tight mb-2">{valor !== 'Avaliação' ? valor : 'Serviço'}</div>
-                    <div className="text-[10px] font-light opacity-70 uppercase tracking-[0.2em]">
+                {/* Header */}
+                <div style={{ backgroundColor: '#005f73', padding: '40px 24px', textAlign: 'center', color: '#ffffff', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <h2 style={{ fontSize: '12px', fontWeight: 'normal', letterSpacing: '0.1em', opacity: 0.9, marginBottom: '8px', textTransform: 'uppercase' }}>Informativo TERMEP</h2>
+                    <div style={{ fontSize: '36px', fontWeight: 'bold', letterSpacing: '-0.025em', marginBottom: '8px' }}>{valor !== 'Avaliação' ? valor : 'Serviço'}</div>
+                    <div style={{ fontSize: '10px', fontWeight: 'light', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.2em' }}>
                         {valor !== 'Avaliação' ? 'Status do Serviço' : 'Status do Equipamento'}
                     </div>
                 </div>
 
-                <div className="p-6 space-y-6">
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-[#005f73] shrink-0 border border-gray-100">
-                            <User size={18} />
+                {/* Info List */}
+                <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '9999px', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#005f73', flexShrink: 0, border: '1px solid #f3f4f6' }}>
+                            <div style={{ margin: 'auto' }}><User size={18} /></div>
                         </div>
-                        <div className="flex-1">
-                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-0.5">Cliente</div>
-                            <div className="text-sm font-semibold text-gray-700">{cliente}</div>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-[#005f73] shrink-0 border border-gray-100">
-                            <Car size={18} />
-                        </div>
-                        <div className="flex-1">
-                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-0.5">Equipamento</div>
-                            <div className="text-sm font-semibold text-gray-700">{veiculo} - {placa}</div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '2px' }}>Cliente</div>
+                            <div style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>{cliente}</div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4 relative">
-                        <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-[#005f73] shrink-0 border border-gray-100">
-                            <Activity size={18} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '9999px', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#005f73', flexShrink: 0, border: '1px solid #f3f4f6' }}>
+                            <div style={{ margin: 'auto' }}><Car size={18} /></div>
                         </div>
-                        <div className="flex-1">
-                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-0.5">Status Atual</div>
-                            <div className="text-sm font-semibold text-gray-700">{status}</div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '2px' }}>Equipamento</div>
+                            <div style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>{veiculo} - {placa}</div>
                         </div>
-                        <div className="absolute top-1 right-0 text-[10px] text-gray-300 font-medium">
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '9999px', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#005f73', flexShrink: 0, border: '1px solid #f3f4f6' }}>
+                            <div style={{ margin: 'auto' }}><Activity size={18} /></div>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '2px' }}>Status Atual</div>
+                            <div style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>{status}</div>
+                        </div>
+                        <div style={{ position: 'absolute', top: '4px', right: 0, fontSize: '10px', color: '#d1d5db', fontWeight: '500' }}>
                             {dataStr}
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-[#005f73] shrink-0 border border-gray-100">
-                            <Wrench size={18} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '9999px', backgroundColor: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#005f73', flexShrink: 0, border: '1px solid #f3f4f6' }}>
+                            <div style={{ margin: 'auto' }}><Wrench size={18} /></div>
                         </div>
-                        <div className="flex-1">
-                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter mb-0.5">Serviço Realizado</div>
-                            <div className="text-sm font-medium text-gray-600 leading-snug">{servico}</div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '-0.025em', marginBottom: '2px' }}>Serviço Realizado</div>
+                            <div style={{ fontSize: '14px', fontWeight: '500', color: '#4b5563', lineHeight: 1.25 }}>{servico}</div>
                         </div>
                     </div>
 
+                    {/* Photo */}
                     {base64Photos.length > 0 && (
-                        <div className="mt-4">
-                            <div className="w-full rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
+                        <div style={{ marginTop: '16px' }}>
+                            <div style={{ width: '100%', borderRadius: '16px', overflow: 'hidden', border: '1px solid #f3f4f6', backgroundColor: '#f9fafb' }}>
                                 <img
                                     src={base64Photos[0]}
                                     alt="Foto"
-                                    className="w-full h-auto object-contain block mx-auto"
-                                    style={{ maxHeight: '600px' }}
+                                    style={{ width: '100%', height: 'auto', display: 'block', margin: '0 auto', maxHeight: '600px', objectFit: 'contain' }}
                                 />
                             </div>
                         </div>
                     )}
 
-                    <div className="pt-4 text-center border-t border-gray-50">
-                        <p className="text-[9px] text-gray-300 font-medium uppercase tracking-widest italic">Digitalizado por Termep</p>
+                    <div style={{ paddingTop: '16px', textAlign: 'center', borderTop: '1px solid #f9fafb' }}>
+                        <p style={{ fontSize: '9px', color: '#d1d5db', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.1em', fontStyle: 'italic' }}>Digitalizado por Termep</p>
                     </div>
                 </div>
             </div>
