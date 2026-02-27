@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { User, Car, Activity, Wrench, Share2, ArrowLeft, Loader2, Camera, ClipboardList } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { User, Car, Activity, Wrench, Share2, ArrowLeft, Loader2, Camera, Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 interface ReceiptPreviewProps {
@@ -10,6 +10,10 @@ interface ReceiptPreviewProps {
 export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
     const receiptRef = useRef<HTMLDivElement>(null);
     const [isSharing, setIsSharing] = useState(false);
+    const [isCapturing, setIsCapturing] = useState(true);
+    const [capturedImage, setCapturedImage] = useState<string | null>(null);
+    const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
+    const [base64Photos, setBase64Photos] = useState<string[]>([]);
 
     // Pre-process variables
     const cliente = data.cliente || '';
@@ -29,100 +33,108 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
         dataStr = today.toLocaleDateString('pt-BR');
     }
 
-    // Pre-process Whatsapp message (Fallback Text)
-    let msgWhatsapp = `*Informativo TERMEP*\n`;
-    if (data.valor !== '0.00' && data.valor !== 'Avaliação') msgWhatsapp += `*${valor}*\n`;
-    msgWhatsapp += `\n👤 *Cliente:* ${cliente}\n`;
-    msgWhatsapp += `🚜 *Equipamento:* ${veiculo} - ${placa}\n`;
-    msgWhatsapp += `📊 *Status:* ${status}\n`;
-    msgWhatsapp += `🔧 *Serviço:* ${servico}\n`;
-    msgWhatsapp += `\n📅 _Gerado em ${dataStr}_`;
+    // 1. Converter fotos para Base64 (Evita bugs com Blob no html2canvas)
+    useEffect(() => {
+        async function preparePhotos() {
+            const photos = data.tempPhotos && data.tempPhotos.length > 0 ? data.tempPhotos : data.fotos || [];
+            const processed: string[] = [];
 
-    const handleShare = async () => {
-        if (!receiptRef.current) return;
-        setIsSharing(true);
-
-        try {
-            console.log("Iniciando captura do recibo...");
-            // 1. Garantir que as imagens dentro do recibo estão totalmente carregadas
-            const images = Array.from(receiptRef.current.querySelectorAll('img')) as HTMLImageElement[];
-            const promises = images.map(img => {
-                if (img.complete) return Promise.resolve();
-                return new Promise(resolve => {
-                    img.onload = resolve;
-                    img.onerror = resolve; // Continua mesmo se uma imagem falhar
-                });
-            });
-            await Promise.all(promises);
-
-            // 2. Pequeno delay extra para garantir renderização estável
-            await new Promise(resolve => setTimeout(resolve, 800));
-
-            const canvas = await html2canvas(receiptRef.current, {
-                scale: 2,
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: "#ffffff",
-                logging: true,
-                // Forçar dimensões para evitar cortes
-                width: receiptRef.current.offsetWidth,
-                height: receiptRef.current.offsetHeight,
-                scrollX: 0,
-                scrollY: -window.scrollY,
-                onclone: (doc) => {
-                    const clone = doc.getElementById('receipt-capture');
-                    if (clone) {
-                        clone.style.display = 'block';
+            for (const url of photos) {
+                if (url.startsWith('blob:')) {
+                    try {
+                        const response = await fetch(url);
+                        const blob = await response.blob();
+                        const reader = new FileReader();
+                        const base64 = await new Promise<string>((resolve) => {
+                            reader.onloadend = () => resolve(reader.result as string);
+                            reader.readAsDataURL(blob);
+                        });
+                        processed.push(base64);
+                    } catch (e) {
+                        console.error("Erro ao converter blob para base64:", e);
+                        processed.push(url);
                     }
-                }
-            });
-
-            console.log("Canvas gerado com sucesso.");
-
-            const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png', 0.95));
-            if (!blob) throw new Error("Falha ao gerar o arquivo de imagem.");
-
-            const file = new File([blob], 'informativo_termep.png', { type: 'image/png' });
-
-            // 3. Tentar compartilhar o arquivo (Ideal para Mobile)
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({
-                        files: [file],
-                        title: 'Informativo TERMEP',
-                        text: msgWhatsapp
-                    });
-                    setIsSharing(false);
-                    return; // Sucesso!
-                } catch (shareErr: any) {
-                    if (shareErr.name === 'AbortError') {
-                        setIsSharing(false);
-                        return; // Usuário cancelou, não faz fallback
-                    }
-                    console.warn("Share API falhou, tentando fallback...", shareErr);
+                } else {
+                    processed.push(url);
                 }
             }
+            setBase64Photos(processed);
+        }
+        preparePhotos();
+    }, [data.tempPhotos, data.fotos]);
 
-            // 4. Fallback: Se não conseguir compartilhar o arquivo diretamente
-            // Baixa a imagem para o celular e abre o WhatsApp com o texto
-            const imageUrl = canvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.href = imageUrl;
-            link.download = `TERMEP_${cliente.replace(/\s+/g, '_')}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+    // 2. Captura automática quando as fotos base64 estiverem prontas
+    useEffect(() => {
+        if (base64Photos.length >= 0 && isCapturing && !capturedImage) {
+            // Pequeno delay para garantir renderização do DOM
+            const timer = setTimeout(async () => {
+                if (receiptRef.current) {
+                    try {
+                        const canvas = await html2canvas(receiptRef.current, {
+                            scale: 2,
+                            useCORS: true,
+                            allowTaint: true,
+                            backgroundColor: "#ffffff",
+                            logging: false,
+                        });
 
-            alert("Sua imagem foi baixada automaticamente! Agora, basta anexá-la na conversa do WhatsApp que irá abrir.");
-            fallbackWhatsApp();
+                        const dataUrl = canvas.toDataURL('image/png');
+                        setCapturedImage(dataUrl);
 
+                        canvas.toBlob((blob) => {
+                            setCapturedBlob(blob);
+                            setIsCapturing(false);
+                        }, 'image/png', 0.95);
+                    } catch (err) {
+                        console.error("Erro na captura automática:", err);
+                        setIsCapturing(false);
+                    }
+                }
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [base64Photos, isCapturing, capturedImage]);
+
+    // Message context for text fallback
+    const msgWhatsapp = `*Informativo TERMEP*\n${valor !== 'Avaliação' ? `*${valor}*\n` : ''}\n👤 *Cliente:* ${cliente}\n🚜 *Equipamento:* ${veiculo} - ${placa}\n📊 *Status:* ${status}\n🔧 *Serviço:* ${servico}\n\n📅 _Gerado em ${dataStr}_`;
+
+    const handleShare = async () => {
+        if (!capturedBlob || !capturedImage) {
+            alert("Aguarde o processamento da imagem...");
+            return;
+        }
+
+        setIsSharing(true);
+        const file = new File([capturedBlob], 'informativo_termep.png', { type: 'image/png' });
+
+        try {
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: 'Informativo TERMEP',
+                    text: msgWhatsapp
+                });
+            } else {
+                throw new Error("Share not supported");
+            }
         } catch (error: any) {
-            console.error("Erro crítico no compartilhamento:", error);
-            alert("Não foi possível gerar a imagem. Enviando apenas as informações em texto...");
-            fallbackWhatsApp();
+            if (error.name !== 'AbortError') {
+                handleDownload();
+                fallbackWhatsApp();
+            }
         } finally {
             setIsSharing(false);
         }
+    };
+
+    const handleDownload = () => {
+        if (!capturedImage) return;
+        const link = document.createElement('a');
+        link.href = capturedImage;
+        link.download = `TERMEP_${cliente.replace(/\s+/g, '_')}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const fallbackWhatsApp = () => {
@@ -133,111 +145,139 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
     };
 
     return (
-        <div className="w-full max-w-md mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
+        <div className="w-full max-w-md mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20 px-4">
 
-            {/* Target for html2canvas */}
-            <div
-                ref={receiptRef}
-                id="receipt-capture"
-                className="bg-white rounded-3xl overflow-hidden shadow-xl border border-gray-100 flex flex-col"
-            >
-                {/* Header Section (Novo Design) */}
-                <div className="bg-[#005f73] px-6 py-10 text-center text-white flex flex-col items-center">
-                    <h2 className="text-sm font-normal tracking-wide opacity-90 mb-2">Informativo TERMEP</h2>
-                    <div className="text-4xl font-bold tracking-tight mb-4">{valor !== 'Avaliação' ? valor : 'Status do Serviço'}</div>
-                    <div className="text-sm font-light opacity-80 uppercase tracking-widest">
-                        {valor !== 'Avaliação' ? 'Status do Serviço' : ''}
-                    </div>
-                </div>
-
-                {/* Info List Section */}
-                <div className="p-6 space-y-6 bg-white">
-
-                    {/* Item: Cliente */}
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
-                            <User size={20} />
-                        </div>
-                        <div className="flex-1">
-                            <div className="text-xs font-bold text-gray-800 uppercase">Cliente</div>
-                            <div className="text-sm text-gray-600">{cliente}</div>
+            {/* Stage 1: Invisible Capture Target */}
+            <div className="fixed -left-[9999px] top-0 overflow-hidden">
+                <div
+                    ref={receiptRef}
+                    id="receipt-capture"
+                    className="bg-white w-[375px] overflow-hidden flex flex-col"
+                >
+                    <div className="bg-[#005f73] px-6 py-10 text-center text-white flex flex-col items-center">
+                        <h2 className="text-sm font-normal tracking-wide opacity-90 mb-2 uppercase">Informativo TERMEP</h2>
+                        <div className="text-4xl font-bold tracking-tight mb-2">{valor !== 'Avaliação' ? valor : 'Status do Serviço'}</div>
+                        <div className="text-xs font-light opacity-80 uppercase tracking-widest">
+                            {valor !== 'Avaliação' ? 'Status do Serviço' : ''}
                         </div>
                     </div>
 
-                    {/* Item: Equipamento */}
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
-                            <Car size={20} />
-                        </div>
-                        <div className="flex-1">
-                            <div className="text-xs font-bold text-gray-800 uppercase">Equipamento</div>
-                            <div className="text-sm text-gray-600">{veiculo} - {placa}</div>
-                        </div>
-                    </div>
-
-                    {/* Item: Status */}
-                    <div className="flex items-center gap-4 relative">
-                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
-                            <Activity size={20} />
-                        </div>
-                        <div className="flex-1">
-                            <div className="text-xs font-bold text-gray-800 uppercase">Status Atual</div>
-                            <div className="text-sm text-gray-600">{status}</div>
-                        </div>
-                        <div className="absolute top-0 right-0 text-[10px] text-gray-400 font-medium">
-                            {dataStr}
-                        </div>
-                    </div>
-
-                    {/* Item: Serviço */}
-                    <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
-                            <Wrench size={20} />
-                        </div>
-                        <div className="flex-1">
-                            <div className="text-xs font-bold text-gray-800 uppercase">Serviço Realizado</div>
-                            <div className="text-sm text-gray-600 leading-snug">{servico}</div>
-                        </div>
-                    </div>
-
-                    {/* Large Photo Section */}
-                    {((data.tempPhotos && data.tempPhotos.length > 0) || (data.fotos && data.fotos.length > 0)) && (
-                        <div className="mt-4 pt-2">
-                            <div className="w-full rounded-2xl overflow-hidden border border-gray-100 shadow-inner bg-gray-50">
-                                {(data.tempPhotos && data.tempPhotos.length > 0 ? data.tempPhotos : data.fotos).slice(0, 1).map((url: string, index: number) => (
-                                    <img
-                                        key={index}
-                                        src={url}
-                                        alt="Foto do Serviço"
-                                        className="w-full h-auto object-contain block mx-auto"
-                                        style={{ maxHeight: '600px' }}
-                                    />
-                                ))}
+                    <div className="p-6 space-y-6 bg-white">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
+                                <User size={20} />
+                            </div>
+                            <div className="flex-1">
+                                <div className="text-[10px] font-bold text-gray-800 uppercase leading-none mb-1">Cliente</div>
+                                <div className="text-sm text-gray-600 font-medium">{cliente}</div>
                             </div>
                         </div>
-                    )}
+
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
+                                <Car size={20} />
+                            </div>
+                            <div className="flex-1">
+                                <div className="text-[10px] font-bold text-gray-800 uppercase leading-none mb-1">Equipamento</div>
+                                <div className="text-sm text-gray-600 font-medium">{veiculo} - {placa}</div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 relative">
+                            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
+                                <Activity size={20} />
+                            </div>
+                            <div className="flex-1">
+                                <div className="text-[10px] font-bold text-gray-800 uppercase leading-none mb-1">Status Atual</div>
+                                <div className="text-sm text-gray-600 font-medium">{status}</div>
+                            </div>
+                            <div className="absolute top-0 right-0 text-[10px] text-gray-400 font-medium">
+                                {dataStr}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
+                                <Wrench size={20} />
+                            </div>
+                            <div className="flex-1">
+                                <div className="text-[10px] font-bold text-gray-800 uppercase leading-none mb-1">Serviço Realizado</div>
+                                <div className="text-sm text-gray-600 leading-snug font-medium">{servico}</div>
+                            </div>
+                        </div>
+
+                        {base64Photos.length > 0 && (
+                            <div className="mt-4">
+                                <div className="w-full rounded-2xl overflow-hidden border border-gray-100">
+                                    <img
+                                        src={base64Photos[0]}
+                                        alt="Foto"
+                                        className="w-full h-auto object-contain block mx-auto"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="pt-4 text-center">
+                            <p className="text-[8px] text-gray-300 uppercase tracking-tighter">Comprovante Digital TERMEP</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Actions (Not Captured) */}
-            <div className="flex flex-col gap-3 px-4">
-                <button
-                    onClick={handleShare}
-                    disabled={isSharing}
-                    className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-70"
-                >
-                    {isSharing ? <Loader2 className="animate-spin" size={22} /> : <Share2 size={22} />}
-                    Compartilhar no WhatsApp
-                </button>
-
-                <button
-                    onClick={onBack}
-                    className="w-full flex items-center justify-center gap-2 bg-white text-[#005f73] font-bold py-4 rounded-xl border-2 border-[#005f73] transition-all active:scale-95"
-                >
-                    <ArrowLeft size={22} />
-                    Novo Serviço
-                </button>
+            {/* Stage 2: User Preview */}
+            <div className="text-center">
+                <h3 className="text-lg font-bold text-[#005f73] mb-1">Seu Informativo Digital</h3>
+                <p className="text-xs text-gray-500">Confira abaixo o arquivo que será enviado</p>
             </div>
+
+            <div className="relative group">
+                {isCapturing ? (
+                    <div className="w-full aspect-[3/4] bg-white rounded-3xl flex flex-col items-center justify-center border-2 border-dashed border-gray-200">
+                        <Loader2 className="animate-spin text-[#005f73] mb-3" size={40} />
+                        <p className="text-sm font-medium text-gray-500 animate-pulse">Gerando imagem...</p>
+                    </div>
+                ) : capturedImage ? (
+                    <div className="shadow-2xl rounded-3xl overflow-hidden border border-gray-100">
+                        <img src={capturedImage} alt="Preview do Recibo" className="w-full h-auto block" />
+                    </div>
+                ) : (
+                    <div className="w-full p-8 text-center bg-red-50 text-red-600 rounded-3xl">
+                        Erro ao gerar visualização. Tente novamente.
+                    </div>
+                )}
+            </div>
+
+            {/* Actions */}
+            {!isCapturing && (
+                <div className="flex flex-col gap-3">
+                    <button
+                        onClick={handleShare}
+                        disabled={isSharing}
+                        className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition-all disabled:opacity-70"
+                    >
+                        {isSharing ? <Loader2 className="animate-spin" size={22} /> : <Share2 size={22} />}
+                        Compartilhar no WhatsApp
+                    </button>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <button
+                            onClick={handleDownload}
+                            className="flex items-center justify-center gap-2 bg-gray-100 text-gray-700 font-bold py-3 rounded-xl hover:bg-gray-200 transition-all active:scale-95"
+                        >
+                            <Download size={18} />
+                            Baixar Imagem
+                        </button>
+                        <button
+                            onClick={onBack}
+                            className="flex items-center justify-center gap-2 bg-white text-[#005f73] font-bold py-3 rounded-xl border-2 border-[#005f73] transition-all active:scale-95"
+                        >
+                            <ArrowLeft size={18} />
+                            Novo
+                        </button>
+                    </div>
+                </div>
+            )}
 
         </div>
     );
