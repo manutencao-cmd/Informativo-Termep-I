@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oficina App</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#005f73">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root {
+      --primary: #25D366;
+      --bg: #005f73 !important;
+      --card: #ffffff;
+      --text: #1c1e21;
+      --border: #ddd;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+    body { background-color: var(--bg) !important; color: var(--text); padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; background: var(--card); padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+    h1 { text-align: center; margin-bottom: 20px; font-size: 1.8rem; color: #005f73; border-bottom: 2px solid #005f73; padding-bottom: 10px; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9rem; color: #333; }
+    input, select, textarea { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; }
+    textarea { resize: vertical; min-height: 80px; }
+    button { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 1.2rem; font-weight: bold; cursor: pointer; margin-top: 10px; transition: all 0.3s ease; }
+    button:not(:disabled):hover { background: #1ebe5d; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+    button:disabled { background: #ccc; cursor: not-allowed; transform: none; box-shadow: none; }
+    .loading { display: none; text-align: center; margin-top: 15px; font-size: 1rem; color: #005f73; font-weight: bold; }
+    
+    /* Estilos do Recibo (Preview) */
+    #previewSection { display: none; background: transparent; box-shadow: none; padding: 0; }
+    #receiptContent { background: #f8f9fa; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3); margin-bottom: 20px; position: relative; }
+    .receipt-header { background: var(--bg); padding: 40px 20px; text-align: center; color: white; border-bottom-left-radius: 30px; border-bottom-right-radius: 30px; }
+    .receipt-header h2 { margin: 0; font-size: 1.2rem; font-weight: normal; opacity: 0.9; border: none; color: white; padding: 0; }
+    .receipt-value { font-size: 3.5rem; font-weight: bold; margin: 10px 0; letter-spacing: -1px; }
+    .receipt-subtitle { font-size: 1rem; opacity: 0.8; }
+    .receipt-body { padding: 30px 20px; }
+    .receipt-item { display: flex; align-items: center; margin-bottom: 25px; }
+    .receipt-icon { width: 45px; height: 45px; border-radius: 50%; background: #e9ecef; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-right: 15px; flex-shrink: 0; }
+    .receipt-details { flex: 1; }
+    .receipt-label { font-weight: bold; color: #333; font-size: 0.95rem; margin-bottom: 2px; }
+    .receipt-value-text { color: #444; font-size: 1.15rem; font-weight: 500; white-space: pre-wrap; }
+    .receipt-extra { color: #999; font-size: 0.85rem; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <!-- Formulário -->
+  <div class="container" id="formSection">
+    <h1>Status do Serviço</h1>
+    <form id="oficinaForm">
+      <div class="form-group">
+        <label for="cliente">Cliente *</label>
+        <input type="text" id="cliente" required>
+      </div>
+      <div class="form-group">
+        <label for="telefone">Telefone (com DDD, sem +55) *</label>
+        <input type="tel" id="telefone" pattern="[0-9]{10,11}" placeholder="Ex: 11999999999" required>
+        <span id="telefoneError" style="color: red; font-size: 0.8rem; display: none; margin-top: 5px;">O telefone deve conter apenas números e ter 10 ou 11 dígitos.</span>
+      </div>
+      <div class="form-group">
+        <label for="veiculo">Veículo *</label>
+        <input type="text" id="veiculo" required>
+      </div>
+      <div class="form-group">
+        <label for="placa">Placa *</label>
+        <input type="text" id="placa" required>
+      </div>
+      <div class="form-group">
+        <label for="status">Status *</label>
+        <select id="status" required>
+          <option value="">Selecione...</option>
+          <option value="Em análise">Em análise</option>
+          <option value="Aguardando peça">Aguardando peça</option>
+          <option value="Em execução">Em execução</option>
+          <option value="Finalizado">Finalizado</option>
+          <option value="Entregue">Entregue</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="servico">Serviço realizado *</label>
+        <textarea id="servico" required></textarea>
+      </div>
+      <div class="form-group">
+        <label for="valor">Valor (R$)</label>
+        <input type="number" id="valor" step="0.01" placeholder="0.00">
+      </div>
+      <div class="form-group">
+        <label for="fotos">Fotos (Câmera ou Galeria)</label>
+        <input type="file" id="fotos" accept="image/*" multiple capture="environment">
+      </div>
+      <button type="submit" id="btnSubmit" style="background: #005f73;">Salvar</button>
+      <div class="loading" id="loading">Processando e salvando...</div>
+    </form>
+  </div>
+
+  <!-- Preview (Recibo) -->
+  <div class="container" id="previewSection">
+    <div id="receiptContent">
+      <div class="receipt-header">
+        <h2>Informativo TERMEP</h2>
+        <div class="receipt-value" id="previewValor">R$ 0,00</div>
+        <div class="receipt-subtitle" id="previewStatusTop">Status do Serviço</div>
+      </div>
+      <div class="receipt-body">
+        <div class="receipt-item">
+          <div class="receipt-icon">👤</div>
+          <div class="receipt-details">
+            <div class="receipt-label">Cliente</div>
+            <div class="receipt-value-text" id="previewCliente">João</div>
+          </div>
+        </div>
+        <div class="receipt-item">
+          <div class="receipt-icon">🚜</div>
+          <div class="receipt-details">
+            <div class="receipt-label">Equipamento</div>
+            <div class="receipt-value-text" id="previewVeiculo">Civic - ABC1234</div>
+          </div>
+        </div>
+        <div class="receipt-item">
+          <div class="receipt-icon">📊</div>
+          <div class="receipt-details">
+            <div class="receipt-label">Status Atual</div>
+            <div class="receipt-value-text" id="previewStatusBottom">Em execução</div>
+          </div>
+          <div class="receipt-extra" id="previewData">26/02/26</div>
+        </div>
+        <div class="receipt-item">
+          <div class="receipt-icon">🔧</div>
+          <div class="receipt-details">
+            <div class="receipt-label">Serviço Realizado</div>
+            <div class="receipt-value-text" id="previewServico">Troca de óleo</div>
+          </div>
+        </div>
+        <!-- Container para as fotos anexadas -->
+        <div id="previewFotosContainer" style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px;"></div>
+      </div>
+    </div>
+    
+    <button id="btnSendWhatsapp" style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12.031 0C5.383 0 0 5.383 0 12.031c0 2.124.553 4.195 1.604 6.014L.265 24l6.102-1.601c1.76.98 3.76 1.496 5.82 1.496 6.646 0 12.029-5.383 12.029-12.031C24.216 5.383 18.833 0 12.031 0zm0 21.906c-1.801 0-3.564-.484-5.11-1.401l-.366-.217-3.795.996.996-3.795-.217-.366c-.917-1.546-1.401-3.309-1.401-5.11 0-5.546 4.515-10.061 10.061-10.061s10.061 4.515 10.061 10.061-4.515 10.061-10.061 10.061zm5.524-7.536c-.303-.152-1.793-.886-2.071-.987-.278-.101-.48-.152-.682.152-.202.303-.783.987-.96 1.19-.177.202-.354.227-.657.076-1.364-.682-2.374-1.238-3.309-2.551-.253-.354.253-.328.834-1.49.076-.152.038-.278-.038-.404-.076-.126-.682-1.642-.935-2.248-.253-.581-.505-.682-.505h-.581c-.202 0-.531.076-.808.379-.278.303-1.061 1.036-1.061 2.526s1.086 2.93 1.238 3.132c.152.202 2.147 3.258 5.178 4.572 1.844.783 2.526.884 3.461.733.935-.152 2.374-.96 2.703-1.895.328-.935.328-1.743.227-1.895-.101-.152-.303-.253-.606-.404z"/></svg>
+      Enviar WhatsApp
+    </button>
+    <button id="btnBack" style="background: #ffffff; color: #005f73; border: 2px solid #005f73;">Voltar e Novo Serviço</button>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-storage.js";
+
+    const firebaseConfig = {
+      apiKey: "SUA_API_KEY",
+      authDomain: "SEU_DOMINIO.firebaseapp.com",
+      projectId: "SEU_PROJECT_ID",
+      storageBucket: "SEU_BUCKET.appspot.com",
+      messagingSenderId: "SEU_SENDER_ID",
+      appId: "SEU_APP_ID"
+    };
+
+    let db, storage;
+    try {
+      if (firebaseConfig.apiKey !== "SUA_API_KEY") {
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        storage = getStorage(app);
+      }
+    } catch (e) { console.error(e); }
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js').then(reg => reg.update());
+      });
+    }
+
+    const form = document.getElementById('oficinaForm');
+    const btnSubmit = document.getElementById('btnSubmit');
+    const loading = document.getElementById('loading');
+    
+    const formSection = document.getElementById('formSection');
+    const previewSection = document.getElementById('previewSection');
+    const btnSendWhatsapp = document.getElementById('btnSendWhatsapp');
+    const btnBack = document.getElementById('btnBack');
+
+    let currentMensagemTexto = '';
+    let currentTelefone = '';
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const telefoneInput = document.getElementById('telefone').value;
+      const telefoneError = document.getElementById('telefoneError');
+      if (!/^[0-9]{10,11}$/.test(telefoneInput)) {
+        telefoneError.style.display = 'block';
+        return;
+      }
+      telefoneError.style.display = 'none';
+
+      btnSubmit.disabled = true;
+      loading.style.display = 'block';
+
+      try {
+        const cliente = document.getElementById('cliente').value.trim();
+        currentTelefone = telefoneInput;
+        const veiculo = document.getElementById('veiculo').value.trim();
+        const placa = document.getElementById('placa').value.trim();
+        const status = document.getElementById('status').value;
+        const servico = document.getElementById('servico').value.trim();
+        const valorInput = document.getElementById('valor').value;
+        const valor = valorInput ? parseFloat(valorInput).toFixed(2) : '0.00';
+        const fotosInput = document.getElementById('fotos');
+
+        const hoje = new Date();
+        const dataFormatada = `${String(hoje.getDate()).padStart(2, '0')}/${String(hoje.getMonth() + 1).padStart(2, '0')}/${String(hoje.getFullYear()).slice(-2)}`;
+
+        let fotosUrls = [];
+        if (fotosInput.files.length > 0 && storage) {
+          for (let i = 0; i < fotosInput.files.length; i++) {
+            const file = fotosInput.files[i];
+            const fileName = `oficina/${Date.now()}_${file.name}`;
+            const storageRef = ref(storage, fileName);
+            const snapshot = await uploadBytes(storageRef, file);
+            const url = await getDownloadURL(snapshot.ref);
+            fotosUrls.push(url);
+          }
+        }
+
+        if (db) {
+          await addDoc(collection(db, "servicos"), {
+            cliente, telefone: currentTelefone, veiculo, placa, status, servico, valor, fotos: fotosUrls, data: hoje
+          });
+        }
+
+        // Preencher o Preview Visual
+        const valorFormatado = valor !== '0.00' ? valor.replace('.', ',') : '0,00';
+        document.getElementById('previewValor').innerText = valor !== '0.00' ? `R$ ${valorFormatado}` : 'Status';
+        document.getElementById('previewCliente').innerText = cliente;
+        document.getElementById('previewVeiculo').innerText = `${veiculo} - ${placa}`;
+        document.getElementById('previewStatusBottom').innerText = status;
+        document.getElementById('previewData').innerText = dataFormatada;
+        document.getElementById('previewServico').innerText = servico;
+
+        // Exibir as fotos anexadas no preview usando URL local (para evitar problemas de CORS no html2canvas)
+        const fotosContainer = document.getElementById('previewFotosContainer');
+        fotosContainer.innerHTML = ''; // Limpa fotos anteriores
+        if (fotosInput.files.length > 0) {
+          for (let i = 0; i < fotosInput.files.length; i++) {
+            const file = fotosInput.files[i];
+            const imgUrl = URL.createObjectURL(file);
+            const img = document.createElement('img');
+            img.src = imgUrl;
+            img.style.width = '100%';
+            img.style.borderRadius = '12px';
+            img.style.objectFit = 'cover';
+            img.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
+            fotosContainer.appendChild(img);
+          }
+        }
+
+        // Montar a mensagem de texto para o WhatsApp (fallback)
+        currentMensagemTexto = `*Informativo TERMEP*\n`;
+        if (valor !== '0.00') currentMensagemTexto += `*R$ ${valorFormatado}*\n`;
+        else currentMensagemTexto += `*Status do Serviço*\n`;
+        currentMensagemTexto += `_Acompanhamento do seu equipamento_\n\n`;
+        currentMensagemTexto += `👤 *Cliente*\n${cliente}\n\n`;
+        currentMensagemTexto += `🚜 *Equipamento*\n${veiculo} - ${placa}\n\n`;
+        currentMensagemTexto += `📊 *Status Atual*\n${status}\n_${dataFormatada}_\n\n`;
+        currentMensagemTexto += `🔧 *Serviço Realizado*\n${servico}\n`;
+        if (fotosUrls.length > 0) currentMensagemTexto += `\n📸 *Fotos do Serviço*\n${fotosUrls.join('\n')}`;
+
+        // Alternar telas
+        formSection.style.display = 'none';
+        previewSection.style.display = 'block';
+
+      } catch (error) {
+        console.error(error);
+        alert("Erro ao salvar. Verifique o console.");
+      } finally {
+        btnSubmit.disabled = false;
+        loading.style.display = 'none';
+      }
+    });
+
+    // Ação de Enviar WhatsApp (Gera Imagem e Compartilha)
+    btnSendWhatsapp.addEventListener('click', async () => {
+      const originalBtnText = btnSendWhatsapp.innerHTML;
+      btnSendWhatsapp.innerHTML = 'Gerando imagem...';
+      btnSendWhatsapp.disabled = true;
+
+      try {
+        const receiptElement = document.getElementById('receiptContent');
+        
+        // Gera a imagem usando html2canvas
+        const canvas = await html2canvas(receiptElement, {
+          scale: 2, // Alta qualidade
+          backgroundColor: '#f8f9fa',
+          logging: false
+        });
+
+        canvas.toBlob(async (blob) => {
+          const file = new File([blob], 'status_servico.png', { type: 'image/png' });
+          
+          // Tenta usar a API de Compartilhamento Nativa (Web Share API)
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+              await navigator.share({
+                title: 'Status do Serviço',
+                text: currentMensagemTexto,
+                files: [file]
+              });
+            } catch (err) {
+              console.log('Compartilhamento cancelado ou falhou', err);
+              fallbackWhatsApp();
+            }
+          } else {
+            // Fallback para Desktop ou navegadores sem suporte a compartilhamento de arquivos
+            fallbackWhatsApp();
+            
+            // Opcional: Baixar a imagem automaticamente no desktop
+            const link = document.createElement('a');
+            link.download = 'status_servico.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+          }
+          
+          btnSendWhatsapp.innerHTML = originalBtnText;
+          btnSendWhatsapp.disabled = false;
+        }, 'image/png');
+
+      } catch (error) {
+        console.error("Erro ao gerar imagem:", error);
+        fallbackWhatsApp();
+        btnSendWhatsapp.innerHTML = originalBtnText;
+        btnSendWhatsapp.disabled = false;
+      }
+    });
+
+    function fallbackWhatsApp() {
+      const urlWhatsapp = `https://wa.me/55${currentTelefone}?text=${encodeURIComponent(currentMensagemTexto)}`;
+      window.open(urlWhatsapp, '_blank');
+    }
+
+    // Botão Voltar
+    btnBack.addEventListener('click', () => {
+      form.reset();
+      document.getElementById('fotos').value = '';
+      previewSection.style.display = 'none';
+      formSection.style.display = 'block';
+    });
+  </script>
+</body>
+</html>

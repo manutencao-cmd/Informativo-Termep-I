@@ -1,0 +1,5 @@
+{
+  "name": "Informativo Termep",
+  "description": "PWA para oficina mecânica com envio de atualizações via WhatsApp e integração Firebase.",
+  "requestFramePermissions": []
+}
