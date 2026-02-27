@@ -69,8 +69,13 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
             }
 
             setStatus('Salvando informações...');
+
+            // Removemos o campo 'fotos' original (que contém os arquivos brutos) 
+            // antes de enviar para o Firestore, pois ele não aceita objetos File.
+            const { fotos: _, ...dataSemArquivosBrutos } = data;
+
             const serviceData = {
-                ...data,
+                ...dataSemArquivosBrutos,
                 telefone: rawPhone,
                 valor,
                 arquivos: anexos,
