@@ -6,24 +6,32 @@
   --color-brand: #005f73;
   --color-brand-light: #007c96;
   --color-accent: #25D366;
-  --color-accent-hover: #1ebe5d;
-  --color-bg-light: #f4f7f8;
+  --color-bg-light: #f8fafb;
   --color-card: #ffffff;
 }
 
 @layer base {
   body {
-    background-color: var(--color-brand);
-    color: #111827;
+    background-color: white;
+    color: #1a1a1a;
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
     min-height: 100vh;
   }
 
   @media (min-width: 640px) {
     body {
       background-color: var(--color-bg-light);
-      padding: 1rem;
+      padding: 2rem 1rem;
     }
+  }
+}
+
+@layer components {
+  .input-field {
+    @apply w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand transition-all text-base placeholder:text-gray-400;
+  }
+
+  .label-text {
+    @apply block text-sm font-bold text-gray-800 mb-1.5;
   }
 }

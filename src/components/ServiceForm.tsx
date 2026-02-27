@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Camera, Car, User, FileText, CheckCircle, ChevronRight, Loader2, DollarSign } from 'lucide-react';
 import { collection, addDoc, ref, uploadBytes, getDownloadURL, db, storage } from '../lib/firebase';
 import { cn } from '../lib/cn';
 
@@ -25,7 +24,6 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
         }
         setErrorPhone(false);
 
-
         setLoading(true);
 
         try {
@@ -34,7 +32,7 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
             const hoje = new Date();
 
             let fotosUrls: string[] = [];
-            let tempPhotos: string[] = []; // Used for raw preview before Firebase is done if needed
+            let tempPhotos: string[] = [];
 
             if (files.length > 0) {
                 for (let i = 0; i < files.length; i++) {
@@ -51,7 +49,6 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
                             fotosUrls.push(url);
                         } catch (storageErr) {
                             console.warn("Falha no upload para o Storage (plano ou permissão):", storageErr);
-                            // Continuamos sem a URL remota, usando apenas o blob local para o preview imediato
                         }
                     }
                 }
@@ -70,7 +67,7 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
                 await addDoc(collection(db, "servicos"), serviceData);
             }
 
-            onSuccess({ ...serviceData, data: new Date() }); // Pass data up for the receipt preview
+            onSuccess({ ...serviceData, data: new Date() });
         } catch (err) {
             console.error(err);
             alert("Erro ao salvar. Verifique o console.");
@@ -86,117 +83,83 @@ export function ServiceForm({ onSuccess }: ServiceFormProps) {
     };
 
     return (
-        <div className="w-full max-w-2xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-
-            <div className="text-center space-y-2 mb-8">
-                <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand to-brand-light">
-                    Novo Serviço
+        <div className="w-full max-w-xl mx-auto py-6 px-4 bg-white shadow-sm sm:rounded-lg border border-gray-100">
+            <div className="mb-6 relative">
+                <h1 className="text-2xl font-bold text-[#005f73] text-center pb-2">
+                    Status do Serviço
                 </h1>
-                <p className="text-gray-500 font-medium">Informativo Registro TERMEP</p>
+                <div className="h-0.5 bg-[#005f73] w-full" />
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                    <label htmlFor="cliente" className="label-text">Cliente *</label>
+                    <input type="text" id="cliente" name="cliente" required className="input-field" />
+                </div>
 
-                {/* Card 1: Cliente */}
-                <fieldset className="glass-card p-6 sm:p-8 relative group hover:border-brand-light/30 transition-colors">
-                    <legend className="sr-only">Dados do Cliente</legend>
-                    <div className="absolute -left-3 -top-3 w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center border border-gray-100/50 text-brand">
-                        <User size={24} strokeWidth={1.5} />
+                <div>
+                    <label htmlFor="telefone" className="label-text">Telefone (com DDD, sem +55) *</label>
+                    <input type="tel" id="telefone" name="telefone" required className={cn("input-field", errorPhone && "border-red-500")} placeholder="Ex: 11999999999" />
+                    {errorPhone && <p className="text-red-500 text-sm mt-1">Digite apenas números (10 ou 11 dígitos).</p>}
+                </div>
+
+                <div>
+                    <label htmlFor="veiculo" className="label-text">Veículo *</label>
+                    <input type="text" id="veiculo" name="veiculo" required className="input-field" />
+                </div>
+
+                <div>
+                    <label htmlFor="placa" className="label-text">Placa *</label>
+                    <input type="text" id="placa" name="placa" required className="input-field" />
+                </div>
+
+                <div>
+                    <label htmlFor="status" className="label-text">Status *</label>
+                    <select id="status" name="status" required className="input-field appearance-none bg-white">
+                        <option value="">Selecione...</option>
+                        <option value="Em análise">Em análise</option>
+                        <option value="Aguardando peça">Aguardando peça</option>
+                        <option value="Em execução">Em execução</option>
+                        <option value="Finalizado">Finalizado</option>
+                        <option value="Entregue">Entregue</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label htmlFor="servico" className="label-text">Serviço realizado *</label>
+                    <textarea id="servico" name="servico" required className="input-field min-h-[100px] resize-y" />
+                </div>
+
+                <div>
+                    <label htmlFor="valor" className="label-text">Valor (R$)</label>
+                    <input type="number" id="valor" name="valor" step="0.01" className="input-field" placeholder="0.00" />
+                </div>
+
+                <div>
+                    <label htmlFor="fotos" className="label-text">Fotos (Câmera ou Galeria)</label>
+                    <div className="relative">
+                        <input
+                            type="file"
+                            id="fotos"
+                            name="fotos"
+                            accept="image/*"
+                            multiple
+                            capture="environment"
+                            onChange={handleFileChange}
+                            className="input-field py-1"
+                        />
                     </div>
+                </div>
 
-                    <div className="space-y-4 pt-2">
-                        <div>
-                            <label htmlFor="cliente" className="label-text">Nome do Cliente *</label>
-                            <input type="text" id="cliente" name="cliente" required className="input-field" placeholder="Ex: João Silva" />
-                        </div>
-                        <div>
-                            <label htmlFor="telefone" className="label-text">WhatsApp (com DDD) *</label>
-                            <input type="tel" id="telefone" name="telefone" required className={cn("input-field", errorPhone && "border-red-500")} placeholder="Ex: 11999999999" />
-                            {errorPhone && <p className="text-red-500 text-sm mt-1">Digite apenas números (10 ou 11 dígitos).</p>}
-                        </div>
-                    </div>
-                </fieldset>
-
-                {/* Card 2: Equipamento */}
-                <fieldset className="glass-card p-6 sm:p-8 relative group hover:border-brand-light/30 transition-colors">
-                    <legend className="sr-only">Dados do Equipamento</legend>
-                    <div className="absolute -left-3 -top-3 w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center border border-gray-100/50 text-brand">
-                        <Car size={24} strokeWidth={1.5} />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                        <div>
-                            <label htmlFor="veiculo" className="label-text">Equipamento/Veículo *</label>
-                            <input type="text" id="veiculo" name="veiculo" required className="input-field" placeholder="Ex: Trator John Deere" />
-                        </div>
-                        <div>
-                            <label htmlFor="placa" className="label-text">Placa/Identificação *</label>
-                            <input type="text" id="placa" name="placa" required className="input-field" placeholder="Ex: ABC-1234" />
-                        </div>
-                    </div>
-                </fieldset>
-
-                {/* Card 3: Serviço */}
-                <fieldset className="glass-card p-6 sm:p-8 relative group hover:border-brand-light/30 transition-colors">
-                    <legend className="sr-only">Informações do Serviço</legend>
-                    <div className="absolute -left-3 -top-3 w-12 h-12 bg-white rounded-2xl shadow-sm flex items-center justify-center border border-gray-100/50 text-brand">
-                        <FileText size={24} strokeWidth={1.5} />
-                    </div>
-
-                    <div className="space-y-4 pt-2">
-                        <div>
-                            <label htmlFor="status" className="label-text">Status Atual *</label>
-                            <select id="status" name="status" required className="input-field appearance-none bg-white">
-                                <option value="">Selecione o andamento...</option>
-                                <option value="Em análise">Em análise</option>
-                                <option value="Aguardando peça">Aguardando peça</option>
-                                <option value="Em execução">Em execução</option>
-                                <option value="Finalizado">Finalizado</option>
-                                <option value="Entregue">Entregue</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label htmlFor="servico" className="label-text">Descrição do Serviço *</label>
-                            <textarea id="servico" name="servico" required className="input-field min-h-[100px] resize-y" placeholder="Descreva os serviços realizados..." />
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label htmlFor="valor" className="label-text flex items-center gap-1"><DollarSign size={16} /> Valor (opcional)</label>
-                                <input type="number" id="valor" name="valor" step="0.01" className="input-field" placeholder="0.00" />
-                            </div>
-                            <div>
-                                <label htmlFor="fotos" className="label-text flex items-center gap-1"><Camera size={16} /> Anexos</label>
-                                <div className="relative">
-                                    <input type="file" id="fotos" name="fotos" accept="image/*" multiple capture="environment" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                                    <div className="input-field flex items-center justify-between bg-white text-gray-500 hover:bg-gray-50 transition-colors">
-                                        <span>{files.length > 0 ? `${files.length} arquivo(s)` : 'Tirar Foto / Galeria'}</span>
-                                        <ChevronRight size={18} className="opacity-50" />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </fieldset>
-
-                {/* Submit */}
-                <div className="pt-4">
+                <div className="pt-6">
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full relative group overflow-hidden rounded-2xl bg-brand text-white font-semibold text-lg p-5 shadow-[0_8px_20px_rgb(0,95,115,0.25)] hover:shadow-[0_8px_25px_rgb(0,95,115,0.4)] hover:-translate-y-1 transition-all disabled:opacity-70 disabled:hover:translate-y-0"
+                        className="w-full bg-[#005f73] text-white font-bold text-lg py-3 rounded-md hover:bg-[#004d5d] transition-colors shadow-sm disabled:opacity-70"
                     >
-                        <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
-                        <span className="relative flex items-center justify-center gap-2">
-                            {loading ? (
-                                <><Loader2 className="animate-spin" /> Registrando...</>
-                            ) : (
-                                <><CheckCircle size={22} /> Gerar Informativo</>
-                            )}
-                        </span>
+                        {loading ? "Salvando..." : "Salvar"}
                     </button>
                 </div>
-
             </form>
         </div>
     );
