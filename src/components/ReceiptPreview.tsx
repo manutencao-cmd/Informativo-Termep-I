@@ -32,7 +32,7 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
         dataStr = today.toLocaleDateString('pt-BR');
     }
 
-    const arquivos = data.tempAnexos && data.tempAnexos.length > 0 ? data.tempAnexos : data.arquivos || [];
+    const arquivos = (data.arquivos && data.arquivos.length > 0) ? data.arquivos : data.tempAnexos || [];
 
     // 1. Converter APENAS FOTOS para Base64 (Crucial para html2canvas no mobile)
     useEffect(() => {
@@ -75,7 +75,7 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
     }, [data.tempAnexos, data.arquivos]);
 
     const linksAnexos = arquivos
-        .filter((a: any) => a.type !== 'image')
+        .filter((a: any) => a.type !== 'image' && !a.url.startsWith('blob:'))
         .map((a: any) => `\n🔗 *${a.type === 'video' ? 'Vídeo' : 'PDF'}:* ${a.url}`)
         .join('');
 
