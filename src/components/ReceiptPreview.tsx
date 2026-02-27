@@ -32,7 +32,16 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
         dataStr = today.toLocaleDateString('pt-BR');
     }
 
-    const arquivos = (data.arquivos && data.arquivos.length > 0) ? data.arquivos : (data.tempAnexos || []);
+    // Unificar arquivos temporários e permanentes
+    // Se um arquivo já tem URL permanente, usamos ela. Caso contrário, usamos a temporária.
+    const anexosFinais = [...(data.arquivos || [])];
+    if (data.tempAnexos) {
+        data.tempAnexos.forEach((temp: any) => {
+            const jaExiste = anexosFinais.some(f => f.name === temp.name);
+            if (!jaExiste) anexosFinais.push(temp);
+        });
+    }
+    const arquivos = anexosFinais;
 
     // 1. Converter APENAS FOTOS para Base64 (Crucial para html2canvas no mobile)
     useEffect(() => {
