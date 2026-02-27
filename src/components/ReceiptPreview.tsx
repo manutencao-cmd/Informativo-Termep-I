@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { User, Car, Activity, Wrench, Share2, ArrowLeft, Loader2, Camera } from 'lucide-react';
+import { User, Car, Activity, Wrench, Share2, ArrowLeft, Loader2, Camera, ClipboardList } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 interface ReceiptPreviewProps {
@@ -98,109 +98,107 @@ export function ReceiptPreview({ data, onBack }: ReceiptPreviewProps) {
     };
 
     return (
-        <div className="w-full max-w-2xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500">
+        <div className="w-full max-w-md mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
 
             {/* Target for html2canvas */}
             <div
                 ref={receiptRef}
-                className="bg-card rounded-[2rem] overflow-hidden shadow-2xl shadow-brand/10 border border-gray-100 relative"
+                className="bg-white rounded-3xl overflow-hidden shadow-xl border border-gray-100 flex flex-col"
             >
-                {/* Header Ribbon */}
-                <div className="bg-brand px-8 pt-10 pb-12 text-center text-white relative flex flex-col items-center">
-                    {/* Soft decorative glow */}
-                    <div className="absolute top-0 left-1/2 -top-1/2 -translate-x-1/2 w-3/4 h-full bg-brand-light/40 blur-3xl rounded-full" />
-
-                    <h2 className="text-sm font-medium tracking-widest uppercase opacity-80 mb-2 relative z-10">Informativo TERMEP</h2>
-                    <div className="text-5xl font-extrabold tracking-tight mb-3 relative z-10">{valor}</div>
-                    <div className="inline-flex items-center px-3 py-1 bg-white/15 rounded-full text-sm font-medium relative z-10">
-                        {status}
+                {/* Header Section (Novo Design) */}
+                <div className="bg-[#005f73] px-6 py-10 text-center text-white flex flex-col items-center">
+                    <h2 className="text-sm font-normal tracking-wide opacity-90 mb-2">Informativo TERMEP</h2>
+                    <div className="text-4xl font-bold tracking-tight mb-4">{valor !== 'Avaliação' ? valor : 'Status do Serviço'}</div>
+                    <div className="text-sm font-light opacity-80 uppercase tracking-widest">
+                        {valor !== 'Avaliação' ? 'Status do Serviço' : ''}
                     </div>
                 </div>
 
-                {/* Data Body */}
-                <div className="p-8 space-y-8 bg-white relative">
+                {/* Info List Section */}
+                <div className="p-6 space-y-6 bg-white">
 
-                    {/* Faux cut-out effect on sides */}
-                    <div className="absolute -top-4 -left-4 w-8 h-8 bg-bg-light rounded-full shadow-inner" />
-                    <div className="absolute -top-4 -right-4 w-8 h-8 bg-bg-light rounded-full shadow-inner" />
-
-                    <div className="space-y-6">
-                        <div className="flex items-start gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-gray-50 text-brand flex items-center justify-center shrink-0 border border-gray-100">
-                                <User size={22} className="opacity-80" />
-                            </div>
-                            <div>
-                                <div className="text-gray-400 text-sm font-medium mb-1 tracking-wide">CLIENTE</div>
-                                <div className="text-xl font-bold text-gray-800">{cliente}</div>
-                            </div>
+                    {/* Item: Cliente */}
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
+                            <User size={20} />
                         </div>
-
-                        <div className="w-full h-px bg-gray-100/80" />
-
-                        <div className="flex items-start gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-gray-50 text-brand flex items-center justify-center shrink-0 border border-gray-100">
-                                <Car size={22} className="opacity-80" />
-                            </div>
-                            <div className="w-full flex justify-between items-center">
-                                <div>
-                                    <div className="text-gray-400 text-sm font-medium mb-1 tracking-wide">EQUIPAMENTO</div>
-                                    <div className="text-lg font-bold text-gray-800">{veiculo}</div>
-                                </div>
-                                <div className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono font-medium text-gray-600">
-                                    {placa || 'N/A'}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="w-full h-px bg-gray-100/80" />
-
-                        <div className="flex items-start gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-gray-50 text-brand flex items-center justify-center shrink-0 border border-gray-100">
-                                <Wrench size={22} className="opacity-80" />
-                            </div>
-                            <div>
-                                <div className="text-gray-400 text-sm font-medium mb-1 tracking-wide">SERVIÇO EXECUTADO</div>
-                                <div className="text-base text-gray-700 font-medium whitespace-pre-wrap leading-relaxed">
-                                    {servico}
-                                </div>
-                            </div>
+                        <div className="flex-1">
+                            <div className="text-xs font-bold text-gray-800 uppercase">Cliente</div>
+                            <div className="text-sm text-gray-600">{cliente}</div>
                         </div>
                     </div>
 
-                    {/* Attachments Preview */}
+                    {/* Item: Equipamento */}
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
+                            <Car size={20} />
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-xs font-bold text-gray-800 uppercase">Equipamento</div>
+                            <div className="text-sm text-gray-600">{veiculo} - {placa}</div>
+                        </div>
+                    </div>
+
+                    {/* Item: Status */}
+                    <div className="flex items-center gap-4 relative">
+                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
+                            <Activity size={20} />
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-xs font-bold text-gray-800 uppercase">Status Atual</div>
+                            <div className="text-sm text-gray-600">{status}</div>
+                        </div>
+                        <div className="absolute top-0 right-0 text-[10px] text-gray-400 font-medium">
+                            {dataStr}
+                        </div>
+                    </div>
+
+                    {/* Item: Serviço */}
+                    <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 shrink-0">
+                            <Wrench size={20} />
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-xs font-bold text-gray-800 uppercase">Serviço Realizado</div>
+                            <div className="text-sm text-gray-600 leading-snug">{servico}</div>
+                        </div>
+                    </div>
+
+                    {/* Large Photo Section */}
                     {((data.tempPhotos && data.tempPhotos.length > 0) || (data.fotos && data.fotos.length > 0)) && (
-                        <div className="mt-8 pt-6 border-t border-gray-100 border-dashed">
-                            <div className="text-gray-400 text-sm font-medium mb-4 flex gap-2 items-center"><Camera size={14} /> FOTOS ANEXADAS</div>
-                            <div className="grid grid-cols-2 gap-3">
-                                {(data.tempPhotos && data.tempPhotos.length > 0 ? data.tempPhotos : data.fotos).map((url: string, index: number) => (
-                                    <img key={index} src={url} alt={`Anexo ${index + 1}`} className="w-full h-32 object-cover rounded-xl border border-gray-100" />
+                        <div className="mt-4 pt-2">
+                            <div className="w-full rounded-2xl overflow-hidden border border-gray-100 shadow-inner bg-gray-50">
+                                {(data.tempPhotos && data.tempPhotos.length > 0 ? data.tempPhotos : data.fotos).slice(0, 1).map((url: string, index: number) => (
+                                    <img
+                                        key={index}
+                                        src={url}
+                                        alt="Foto do Serviço"
+                                        className="w-full h-auto object-contain block mx-auto"
+                                        style={{ maxHeight: '600px' }}
+                                    />
                                 ))}
                             </div>
                         </div>
                     )}
-
-                    <div className="pt-6 w-full text-center text-xs text-brand/40 font-semibold tracking-widest">
-                        — {dataStr} —
-                    </div>
                 </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Actions (Not Captured) */}
+            <div className="flex flex-col gap-3 px-4">
                 <button
                     onClick={handleShare}
                     disabled={isSharing}
-                    className="w-full flex items-center justify-center gap-2 bg-accent hover:bg-accent-hover text-white font-semibold py-4 px-6 rounded-2xl transition-all shadow-[0_8px_20px_rgb(37,211,102,0.25)] hover:shadow-[0_8px_25px_rgb(37,211,102,0.4)] disabled:opacity-70 disabled:hover:translate-y-0 hover:-translate-y-1"
+                    className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-70"
                 >
-                    {isSharing ? <Loader2 className="animate-spin" size={20} /> : <Share2 size={20} />}
+                    {isSharing ? <Loader2 className="animate-spin" size={22} /> : <Share2 size={22} />}
                     Compartilhar no WhatsApp
                 </button>
 
                 <button
                     onClick={onBack}
-                    className="w-full flex items-center justify-center gap-2 bg-white text-brand border-2 border-brand hover:bg-gray-50 font-semibold py-4 px-6 rounded-2xl transition-all hover:-translate-y-1"
+                    className="w-full flex items-center justify-center gap-2 bg-white text-[#005f73] font-bold py-4 rounded-xl border-2 border-[#005f73] transition-all active:scale-95"
                 >
-                    <ArrowLeft size={20} />
+                    <ArrowLeft size={22} />
                     Novo Serviço
                 </button>
             </div>
